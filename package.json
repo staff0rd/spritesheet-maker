@@ -1,0 +1,37 @@
+{
+  "name": "spritesheet-maker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Procedural 3D-to-2D layered character spritesheet generator",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/staff0rd/spritesheet-maker.git"
+  },
+  "license": "ISC",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "generate": "tsx scripts/generate.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "knip": "knip"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
+    "eslint": "^9.39.5",
+    "knip": "^6.44.1",
+    "playwright": "^1.64.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^7.3.7",
+    "vitest": "^3.2.7"
+  }
+}

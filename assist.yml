@@ -1,0 +1,30 @@
+run:
+  - name: verify:typecheck
+    command: npm
+    args:
+      - run
+      - typecheck
+    quiet: true
+  - name: verify:lint
+    command: npm
+    args:
+      - run
+      - lint
+    quiet: true
+  - name: verify:lint:fix
+    command: npm
+    args:
+      - run
+      - lint:fix
+    quiet: true
+  - name: verify:knip
+    command: npm
+    args:
+      - run
+      - knip
+    quiet: true
+  - name: verify:test
+    command: npm
+    args:
+      - test
+    quiet: true
