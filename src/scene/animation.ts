@@ -1,6 +1,8 @@
 import { ARMS, LEGS, type JointName, type Rig } from "./rig";
 
-export type Pose = Partial<Record<JointName, number>>;
+export type Pose = Partial<Record<JointName | "lift", number>>;
+
+const UPPER_BODY = ["torso", "head", "armLeft", "armRight"] as const;
 
 interface Clip {
   name: string;
@@ -13,7 +15,9 @@ const WALK_THIGH = 0.45;
 const WALK_KNEE = 0.75;
 const WALK_ARM = 0.4;
 const WALK_ELBOW = -0.3;
-const IDLE_DIP = 0.3;
+const IDLE_FRAMES = 6;
+const IDLE_LIFT = 0.028;
+const IDLE_ARM = 0.06;
 
 function walkPose(phase: number): Pose {
   const swing = Math.sin(phase);
@@ -29,21 +33,23 @@ function walkPose(phase: number): Pose {
   return pose;
 }
 
-function idlePose(dip: number): Pose {
-  const pose: Pose = {};
-  for (const leg of LEGS) {
-    pose[leg.upper] = -dip;
-    pose[leg.lower] = 2 * dip;
-  }
-  for (const arm of ARMS) {
-    pose[arm.upper] = dip * 0.3;
-    pose[arm.lower] = -dip * 0.5;
+function idlePose(phase: number): Pose {
+  const breath = (1 - Math.cos(phase)) / 2;
+  const pose: Pose = { lift: IDLE_LIFT * breath };
+  for (const [index, side] of [1, -1].entries()) {
+    const arm = ARMS[index];
+    pose[arm.upper] = IDLE_ARM * Math.sin(phase) * side + IDLE_ARM * breath;
+    pose[arm.lower] = -0.12 - IDLE_ARM * breath;
   }
   return pose;
 }
 
 export const CLIPS: readonly Clip[] = [
-  { name: "idle", fps: 3, poses: [idlePose(0), idlePose(IDLE_DIP)] },
+  {
+    name: "idle",
+    fps: 3,
+    poses: Array.from({ length: IDLE_FRAMES }, (_, frame) => idlePose((frame / IDLE_FRAMES) * 2 * Math.PI)),
+  },
   {
     name: "walk",
     fps: 8,
@@ -77,6 +83,10 @@ export function applyPose(rig: Rig, pose: Pose): void {
   for (const [name, group] of Object.entries(rig.joints) as [JointName, Rig["joints"][JointName]][]) {
     group.rotation.x = pose[name] ?? 0;
   }
+  const lift = pose.lift ?? 0;
+  for (const name of UPPER_BODY) rig.joints[name].position.y = lift;
+  rig.joints.armLeft.position.y += rig.shape.shoulder.y;
+  rig.joints.armRight.position.y += rig.shape.shoulder.y;
   const reach = Math.max(...LEGS.map((leg) => legReach(rig, leg.upper, leg.lower)));
   rig.root.position.y = (reach - rig.shape.hip.y) * rig.shape.height;
 }

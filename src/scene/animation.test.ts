@@ -22,9 +22,9 @@ describe("sheetFrames", () => {
   it("lays clips out consecutively and records their frame indices", () => {
     const { poses, animations } = sheetFrames(CLIPS);
 
-    expect(animations.idle.frames).toEqual([0, 1]);
-    expect(animations.walk.frames).toEqual([2, 3, 4, 5, 6, 7]);
-    expect(poses).toHaveLength(8);
+    expect(animations.idle.frames).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(animations.walk.frames).toEqual([6, 7, 8, 9, 10, 11]);
+    expect(poses).toHaveLength(12);
   });
 
   it("rejects duplicate and empty clips", () => {
@@ -50,14 +50,19 @@ describe("applyPose", () => {
     }
   });
 
-  it("bobs the body during idle", () => {
+  it("breathes the upper body during idle while the legs stay put", () => {
     const rig = buildCharacter(proceduralProvider, { seed: 1, body: bodies[0].body });
     const idle = CLIPS.find((clip) => clip.name === "idle")!;
     const heights = idle.poses.map((pose) => {
       applyPose(rig, pose);
-      return rig.root.position.y;
+      expect(rig.joints.legLeft.rotation.x).toBe(0);
+      return [rig.joints.torso.position.y, rig.joints.head.position.y, rig.joints.armLeft.position.y - rig.shape.shoulder.y];
     });
-    expect(new Set(heights).size).toBe(idle.poses.length);
+    expect(new Set(heights.map(([torso]) => torso)).size).toBeGreaterThan(2);
+    for (const [torso, head, arm] of heights) {
+      expect(head).toBe(torso);
+      expect(arm).toBeCloseTo(torso);
+    }
   });
 
   it("resets joints the pose leaves unset", () => {
@@ -66,5 +71,7 @@ describe("applyPose", () => {
     applyPose(rig, {});
     expect(Object.values(rig.joints).every((joint) => joint.rotation.x === 0)).toBe(true);
     expect(rig.root.position.y).toBe(0);
+    expect(rig.joints.torso.position.y).toBe(0);
+    expect(rig.joints.armLeft.position.y).toBe(rig.shape.shoulder.y);
   });
 });
