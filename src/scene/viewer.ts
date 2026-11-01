@@ -2,7 +2,7 @@ import { GridHelper, type Group, Mesh, PerspectiveCamera, WebGLRenderer } from "
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PART_CATALOG } from "../core/catalog";
 import type { CategoryId, PartSpec } from "../core/parts";
-import { DEFAULT_RENDER_STYLE, RENDER_STYLES, type RenderStyle } from "../core/style";
+import { RENDER_STYLES, type RenderStyle } from "../core/style";
 import { createLitScene } from "./capture";
 import { applyPose, CLIPS } from "./animation";
 import { buildDressedCharacter, type TintedPart } from "./character";
@@ -46,7 +46,7 @@ function disposeCharacter(character: Group): void {
   });
 }
 
-export function mountViewer(container: HTMLElement): void {
+export function mountViewer(container: HTMLElement, initialStyle: RenderStyle): void {
   document.body.style.margin = "0";
   document.body.style.overflow = "hidden";
   const scene = createLitScene();
@@ -88,7 +88,6 @@ export function mountViewer(container: HTMLElement): void {
   randomise.type = "button";
   randomise.textContent = "Random outfit";
   const sheets = document.createElement("a");
-  sheets.href = "?view=sheets";
   sheets.textContent = "View rendered sheets";
   const crowd = document.createElement("a");
   crowd.href = "/preview.html";
@@ -105,7 +104,7 @@ export function mountViewer(container: HTMLElement): void {
 
   const style = document.createElement("select");
   for (const option of RENDER_STYLES) style.add(new Option(option, option));
-  style.value = DEFAULT_RENDER_STYLE;
+  style.value = initialStyle;
   panel.append(labelled("style", style));
 
   let character: Rig | undefined;
@@ -128,6 +127,7 @@ export function mountViewer(container: HTMLElement): void {
       disposeCharacter(character.root);
     }
     const { body, parts } = selected();
+    sheets.href = `?view=sheets&style=${style.value}`;
     character = buildDressedCharacter(proceduralProvider, Number(seed.value) || 0, body, parts, style.value as RenderStyle);
     scene.add(character.root);
   }

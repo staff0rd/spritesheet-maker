@@ -18,11 +18,8 @@ export type BodyParams = {
 
 export const DEFAULT_BODY_PARAMS: BodyParams = { height: 1, build: 1, shoulders: 1, hips: 1 };
 
-export const TORSO_SEGMENTS = 8;
-export const LIMB_SEGMENTS = 6;
-
 export const STYLE_SEGMENTS: Record<RenderStyle, { torso: number; limb: number }> = {
-  blocky: { torso: TORSO_SEGMENTS, limb: LIMB_SEGMENTS },
+  blocky: { torso: 8, limb: 6 },
   smooth: { torso: 24, limb: 16 },
 };
 

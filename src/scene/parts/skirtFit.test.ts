@@ -2,6 +2,7 @@ import { type BufferAttribute, type LatheGeometry, type Mesh, Vector3 } from "th
 import { describe, expect, it } from "vitest";
 import { PART_CATALOG } from "../../core/catalog";
 import { planSheets } from "../../core/parts";
+import { RENDER_STYLES } from "../../core/style";
 import { applyPose, CLIPS, sheetFrames } from "../animation";
 import { buildCharacter } from "../character";
 import type { Rig } from "../rig";
@@ -24,14 +25,22 @@ function legSurface(rig: Rig): Vector3[] {
   for (const leg of [...findMesh(rig, "thigh"), ...findMesh(rig, "shin")]) {
     const geometry = leg.geometry as LatheGeometry;
     const position = geometry.getAttribute("position") as BufferAttribute;
-    const perColumn = geometry.parameters.points.length;
+    const profile = geometry.parameters.points;
+    const perColumn = profile.length;
+    const rim = profile.flatMap(({ x }, index) => (x > 0 ? [index] : []));
     for (let column = 0; column < position.count / perColumn; column++) {
-      const bottom = new Vector3().fromBufferAttribute(position, column * perColumn + 1);
-      const top = new Vector3().fromBufferAttribute(position, column * perColumn + 2);
-      for (let step = 0; step <= SAMPLES_ALONG_LEG; step++) {
-        points.push(bottom.clone().lerp(top, step / SAMPLES_ALONG_LEG).applyMatrix4(leg.matrixWorld));
+      for (let index = 1; index < rim.length; index++) {
+        const bottom = new Vector3().fromBufferAttribute(position, column * perColumn + rim[index - 1]);
+        const top = new Vector3().fromBufferAttribute(position, column * perColumn + rim[index]);
+        for (let step = 0; step <= SAMPLES_ALONG_LEG; step++) {
+          points.push(bottom.clone().lerp(top, step / SAMPLES_ALONG_LEG).applyMatrix4(leg.matrixWorld));
+        }
       }
     }
+  }
+  for (const knee of findMesh(rig, "knee")) {
+    const position = knee.geometry.getAttribute("position") as BufferAttribute;
+    for (let index = 0; index < position.count; index++) points.push(new Vector3().fromBufferAttribute(position, index).applyMatrix4(knee.matrixWorld));
   }
   return points;
 }
@@ -78,10 +87,10 @@ function exposedLegPoints(rig: Rig): number {
 }
 
 describe("fitSkirts", () => {
-  it.each(skirtJobs.map((job) => [`${job.bodyVariant}/${job.variant}`, job] as const))(
+  it.each(RENDER_STYLES.flatMap((style) => skirtJobs.map((job) => [`${style} ${job.bodyVariant}/${job.variant}`, job, style] as const)))(
     "keeps the %s legs inside the skirt in every frame",
-    (_, job) => {
-      const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part });
+    (_, job, style) => {
+      const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part, style });
       for (const pose of sheetFrames(CLIPS).poses) {
         applyPose(rig, pose);
         expect(exposedLegPoints(rig)).toBe(0);

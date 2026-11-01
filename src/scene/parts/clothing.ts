@@ -1,14 +1,17 @@
-import { BoxGeometry, IcosahedronGeometry } from "three";
-import { ARMS, LEGS, LIMB_SEGMENTS, TORSO_SEGMENTS } from "../rig";
-import { enclosingShell, latheMesh, mesh, radiusAt, segmentShell } from "./geometry";
+import type { RenderStyle } from "../../core/style";
+import { ARMS, LEGS, STYLE_SEGMENTS } from "../rig";
+import { ballGeometry, boxGeometry, footRounding, latheMesh, limbShell, mesh, radiusAt, torsoProfile, torsoShell } from "./geometry";
 import { makeFittedSkirt } from "./skirtFit";
 import { definePart, type BuildContext } from "./types";
 
 const CLOTH_MARGIN = 0.018;
 const SKIRT_DEPTH = 0.75;
 const SKIRT_ROWS = 12;
-const SKIRT_SECTOR = (2 * Math.PI) / TORSO_SEGMENTS;
-const SKIRT_EDGE_SLOPE = (1 - Math.cos(SKIRT_SECTOR)) / (Math.sin(SKIRT_SECTOR) * SKIRT_DEPTH);
+
+function skirtEdgeSlope(style: RenderStyle): number {
+  const sector = (2 * Math.PI) / STYLE_SEGMENTS[style].torso;
+  return (1 - Math.cos(sector)) / (Math.sin(sector) * SKIRT_DEPTH);
+}
 
 type ShirtParams = {
   sleeve: string;
@@ -19,18 +22,19 @@ type ShirtParams = {
   hood: boolean;
 };
 
-function buildShirt({ rig: { shape }, material, detail, add }: BuildContext, params: ShirtParams): void {
+function buildShirt({ rig: { shape }, style, material, detail, add }: BuildContext, params: ShirtParams): void {
+  const segments = STYLE_SEGMENTS[style];
   const margin = params.thickness;
-  add("torso", latheMesh(enclosingShell(shape.torso, params.hem, Infinity, margin), TORSO_SEGMENTS, material, "shirt", shape.torsoDepth));
+  add("torso", latheMesh(torsoShell(shape, style, params.hem, Infinity, margin), segments.torso, material, "shirt", shape.torsoDepth));
 
   if (params.sleeve !== "none") {
     const long = params.sleeve === "long";
     for (const arm of ARMS) {
-      add(arm.upper, latheMesh(segmentShell(shape.upperArm, 0, long ? 1 : 0.5, margin), LIMB_SEGMENTS, material, "sleeve"));
+      add(arm.upper, latheMesh(limbShell(shape.upperArm, style, 0, long ? 1 : 0.5, margin), segments.limb, material, "sleeve"));
       if (long) {
-        add(arm.lower, latheMesh(segmentShell(shape.forearm, 0, 0.95, margin), LIMB_SEGMENTS, material, "sleeve"));
+        add(arm.lower, latheMesh(limbShell(shape.forearm, style, 0, 0.95, margin), segments.limb, material, "sleeve"));
         if (params.cuffs) {
-          add(arm.lower, latheMesh(segmentShell(shape.forearm, 0.82, 0.96, margin * 1.6), LIMB_SEGMENTS, detail, "cuff"));
+          add(arm.lower, latheMesh(limbShell(shape.forearm, style, 0.82, 0.96, margin * 1.6), segments.limb, detail, "cuff"));
         }
       }
     }
@@ -43,7 +47,7 @@ function buildShirt({ rig: { shape }, material, detail, add }: BuildContext, par
         [radius, shape.neck.y - 0.04],
         [radius * 1.15, shape.neck.y + 0.06],
       ],
-      LIMB_SEGMENTS,
+      segments.limb,
       detail,
       "collar",
     );
@@ -51,9 +55,9 @@ function buildShirt({ rig: { shape }, material, detail, add }: BuildContext, par
   }
 
   if (params.hood) {
-    const hood = mesh(new IcosahedronGeometry(0.1, 0), detail, "hood");
+    const hood = mesh(ballGeometry(style, 0.1, 0), detail, "hood");
     hood.scale.set(1.3, 0.75, 0.7);
-    hood.position.set(0, 1.5, -radiusAt(shape.torso, 1.5) * shape.torsoDepth - 0.02);
+    hood.position.set(0, 1.5, -radiusAt(torsoProfile(shape, style), 1.5) * shape.torsoDepth - 0.02);
     add("torso", hood);
   }
 }
@@ -63,19 +67,23 @@ type TrouserParams = {
   belt: boolean;
 };
 
-function buildTrousers({ rig: { shape }, material, detail, add }: BuildContext, params: TrouserParams): void {
-  add("torso", latheMesh(enclosingShell(shape.torso, -Infinity, shape.waistY, CLOTH_MARGIN), TORSO_SEGMENTS, material, "pelvis", shape.torsoDepth));
+function buildTrousers({ rig: { shape }, style, material, detail, add }: BuildContext, params: TrouserParams): void {
+  const segments = STYLE_SEGMENTS[style];
+  add("torso", latheMesh(torsoShell(shape, style, -Infinity, shape.waistY, CLOTH_MARGIN), segments.torso, material, "pelvis", shape.torsoDepth));
   if (params.belt) {
-    add("torso", latheMesh(enclosingShell(shape.torso, shape.waistY - 0.045, shape.waistY, CLOTH_MARGIN * 1.8), TORSO_SEGMENTS, detail, "belt", shape.torsoDepth));
+    add(
+      "torso",
+      latheMesh(torsoShell(shape, style, shape.waistY - 0.045, shape.waistY, CLOTH_MARGIN * 1.8), segments.torso, detail, "belt", shape.torsoDepth),
+    );
   }
 
   const covered = params.legLength * (shape.thigh.length + shape.shin.length);
   const thighFraction = Math.min(1, covered / shape.thigh.length);
   const shinFraction = Math.max(0, (covered - shape.thigh.length) / shape.shin.length);
   for (const leg of LEGS) {
-    add(leg.upper, latheMesh(segmentShell(shape.thigh, 0, thighFraction, CLOTH_MARGIN), LIMB_SEGMENTS, material, "trouserLeg"));
+    add(leg.upper, latheMesh(limbShell(shape.thigh, style, 0, thighFraction, CLOTH_MARGIN), segments.limb, material, "trouserLeg"));
     if (shinFraction > 0) {
-      add(leg.lower, latheMesh(segmentShell(shape.shin, 0, shinFraction, CLOTH_MARGIN), LIMB_SEGMENTS, material, "trouserLeg"));
+      add(leg.lower, latheMesh(limbShell(shape.shin, style, 0, shinFraction, CLOTH_MARGIN), segments.limb, material, "trouserLeg"));
     }
   }
 }
@@ -85,9 +93,11 @@ type SkirtParams = {
   flare: number;
 };
 
-function buildSkirt({ rig: { shape }, material, detail, add }: BuildContext, params: SkirtParams): void {
+function buildSkirt({ rig: { shape }, style, material, detail, add }: BuildContext, params: SkirtParams): void {
+  const segments = STYLE_SEGMENTS[style];
+  const torso = torsoProfile(shape, style);
   const hemY = shape.hip.y - params.length * (shape.thigh.length + shape.shin.length);
-  const hipRadius = Math.max(radiusAt(shape.torso, 0.95), shape.hip.x + shape.thigh.top * Math.hypot(1, SKIRT_EDGE_SLOPE)) + CLOTH_MARGIN;
+  const hipRadius = Math.max(radiusAt(torso, 0.95), shape.hip.x + shape.thigh.top * Math.hypot(1, skirtEdgeSlope(style))) + CLOTH_MARGIN;
   const hemRadius = 0.2 * shape.build + params.flare;
   const panel = Array.from({ length: SKIRT_ROWS }, (_, row): [number, number] => {
     const t = row / SKIRT_ROWS;
@@ -97,37 +107,46 @@ function buildSkirt({ rig: { shape }, material, detail, add }: BuildContext, par
     [
       ...panel,
       [hipRadius, 0.95],
-      [radiusAt(shape.torso, shape.waistY) + CLOTH_MARGIN, shape.waistY],
+      [radiusAt(torso, shape.waistY) + CLOTH_MARGIN, shape.waistY],
       [0, shape.waistY + CLOTH_MARGIN],
     ],
-    TORSO_SEGMENTS,
+    segments.torso,
     material,
     "skirt",
     SKIRT_DEPTH,
   );
   makeFittedSkirt(skirt);
   add("torso", skirt);
-  add("torso", latheMesh(enclosingShell(shape.torso, shape.waistY - 0.04, shape.waistY, CLOTH_MARGIN * 2.4), TORSO_SEGMENTS, detail, "waistband", SKIRT_DEPTH));
+  add(
+    "torso",
+    latheMesh(torsoShell(shape, style, shape.waistY - 0.04, shape.waistY, CLOTH_MARGIN * 2.4), segments.torso, detail, "waistband", SKIRT_DEPTH),
+  );
 }
 
 type ShoeParams = {
   shaft: number;
 };
 
-function buildShoes({ rig: { shape }, material, detail, add }: BuildContext, params: ShoeParams): void {
+const SOLE_HEIGHT = 0.026;
+
+function buildShoes({ rig: { shape }, style, material, detail, add }: BuildContext, params: ShoeParams): void {
   const { foot } = shape;
+  const rounding = footRounding(shape);
   for (const leg of LEGS) {
-    const upper = mesh(new BoxGeometry(foot.width + 2 * CLOTH_MARGIN, foot.height + 2 * CLOTH_MARGIN, foot.depth + 2 * CLOTH_MARGIN), material, "shoe");
+    const upper = mesh(
+      boxGeometry(style, foot.width + 2 * CLOTH_MARGIN, foot.height + 2 * CLOTH_MARGIN, foot.depth + 2 * CLOTH_MARGIN, rounding + CLOTH_MARGIN),
+      material,
+      "shoe",
+    );
     upper.position.set(0, foot.y, foot.z);
     add(leg.lower, upper);
 
-    const soleHeight = 0.026;
-    const sole = mesh(new BoxGeometry(foot.width + 3 * CLOTH_MARGIN, soleHeight, foot.depth + 3.5 * CLOTH_MARGIN), detail, "sole");
-    sole.position.set(0, foot.y - foot.height / 2 + soleHeight / 2 - 0.012, foot.z);
+    const sole = mesh(boxGeometry(style, foot.width + 3 * CLOTH_MARGIN, SOLE_HEIGHT, foot.depth + 3.5 * CLOTH_MARGIN, SOLE_HEIGHT * 0.4), detail, "sole");
+    sole.position.set(0, foot.y - foot.height / 2 + SOLE_HEIGHT / 2 - 0.012, foot.z);
     add(leg.lower, sole);
 
     if (params.shaft > 0) {
-      add(leg.lower, latheMesh(segmentShell(shape.shin, 1 - params.shaft, 1, CLOTH_MARGIN * 1.4), LIMB_SEGMENTS, material, "shaft"));
+      add(leg.lower, latheMesh(limbShell(shape.shin, style, 1 - params.shaft, 1, CLOTH_MARGIN * 1.4), STYLE_SEGMENTS[style].limb, material, "shaft"));
     }
   }
 }
