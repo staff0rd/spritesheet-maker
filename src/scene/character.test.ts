@@ -65,37 +65,6 @@ describe("buildCharacter", () => {
     expect(layerMaterials(character, "hair").every((material) => material.colorWrite)).toBe(true);
   });
 
-  it("leaves the front layer out of the main sheet", () => {
-    const long = jobs.find((job) => job.part?.id === "long")!.part!;
-    const character = buildCharacter(proceduralProvider, { seed: 1, body, part: long }).root;
-
-    expect(meshes(character).some((mesh) => mesh.userData.layer === "hair.front")).toBe(false);
-    expect(layerMaterials(character, "hair").every((material) => material.colorWrite)).toBe(true);
-  });
-
-  it("paints only the front layer in a front sheet, over a depth-only body and main layer", () => {
-    const long = jobs.find((job) => job.part?.id === "long")!.part!;
-    const character = buildCharacter(proceduralProvider, { seed: 1, body, part: long, front: true }).root;
-    const hidden = meshes(character).filter((mesh) => mesh.userData.layer !== "hair.front");
-
-    expect(layerMaterials(character, "hair.front").length).toBeGreaterThan(0);
-    expect(layerMaterials(character, "hair.front").every((material) => material.colorWrite)).toBe(true);
-    expect(hidden.flatMap((mesh) => [mesh.material].flat()).every((material) => !material.colorWrite && material.depthWrite)).toBe(true);
-    expect(hidden.every((mesh) => mesh.renderOrder < 0)).toBe(true);
-  });
-
-  it("rejects a front sheet for a part without a front layer", () => {
-    expect(() => buildCharacter(proceduralProvider, { seed: 1, body, part: spiky, front: true })).toThrow(/front/);
-  });
-
-  it("only emits a front layer from variants marked front", () => {
-    for (const job of jobs.filter((candidate) => candidate.part && !candidate.part.front)) {
-      expect(() => buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part }), job.file).not.toThrow();
-    }
-    const unmarked = { ...jobs.find((job) => job.part?.id === "long")!.part!, front: false };
-    expect(() => buildCharacter(proceduralProvider, { seed: 1, body, part: unmarked })).toThrow(/front/);
-  });
-
   it("is deterministic for a fixed seed", () => {
     for (const job of jobs) {
       const build = () => snapshot(buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part }).root);

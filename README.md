@@ -16,18 +16,15 @@ If Playwright's Chromium is missing, run `npx playwright install chromium`.
 - Categories and variants are listed in `src/core/catalog.ts`: `body` (skin), `hair` (hair), `top`, `bottom`, `shoes`, `hat` (cloth). `hair` and `hat` are optional.
 - Each variant names a procedural `kind` plus params. Kinds are defined in `src/scene/parts/` and served through the `PartProvider` interface. Adding a variant with an existing kind only needs a catalog entry; a new shape needs a new `definePart` definition.
 - Seeded randomness (e.g. spike placement) comes from `CaptureConfig.seed`, hashed per part, so output is deterministic.
-- A definition can put objects on a separate front layer with `add(joint, object, "front")`, for pieces that must draw over a later category (e.g. `long` hair's front locks over the top). Its catalog variant must set `front: true`, and the draw order must then include a `<category>.front` slot after that category.
-
 ## Sheets
 
 - Body sheets are `body/<variant>.png`. Every other part is rendered once per body as `<category>/<variant>.<body>.png`, so clothing fits each build.
 - When rendering a non-body part, the body is drawn depth-only (`colorWrite: false`), so body parts in front of clothing (e.g. an arm in front of the torso) cut holes in that layer.
-- A `front: true` variant also gets `<category>/<variant>.front.<body>.png` per body, holding only its front layer, drawn with the body and the variant's main layer depth-only. The main sheet leaves the front layer out.
 - Everything renders in neutral greys with baked shading on a transparent background, ready for a multiply tint.
 - One row per direction, in `NE`, `SE`, `SW`, `NW` order; one column per animation frame. Every frame is the same size, with the character's feet at the manifest's `anchor` pixel.
 - Orthographic camera at 30° elevation and 45° yaw.
 
 ## Manifest
 
-- `categories.<id>`: `tintGroup`, `optional` and `variants`, where each variant's `files` maps a body variant id to its sheet. Variants with a front layer also have `frontFiles`, mapping a body variant id to the front sheet.
-- `drawOrder.<direction>`: the stacking order (bottom first) of category ids and `<category>.front` slots. Hair goes under the top when facing the camera and over it when facing away. `hair.front` comes right after `top` facing the camera and right after `hair` facing away. For a `.front` slot, draw the picked variant's `frontFiles` sheet with that category's tint, and skip the slot when the variant has no `frontFiles`; `layersFor` in `src/core/compose.ts` does this for `/preview.html` and the Phaser crowd.
+- `categories.<id>`: `tintGroup`, `optional` and `variants`, where each variant's `files` maps a body variant id to its sheet.
+- `drawOrder.<direction>`: the category stacking order (bottom first). Hair goes under the top when facing the camera and over it when facing away.

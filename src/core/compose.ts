@@ -1,6 +1,6 @@
 import type { Direction } from "./directions";
 import type { Manifest } from "./manifest";
-import { slotCategory, type CategoryId, type DrawSlot, type TintGroup } from "./parts";
+import type { CategoryId, TintGroup } from "./parts";
 import type { Random } from "./random";
 
 export const PALETTES: Readonly<Record<TintGroup, readonly string[]>> = {
@@ -39,7 +39,6 @@ export interface Character {
 }
 
 export interface Layer {
-  slot: DrawSlot;
   category: CategoryId;
   file: string;
   tint: string;
@@ -79,18 +78,13 @@ export function layersFor(manifest: Manifest, character: Character, direction: D
   const body = character.parts[manifest.baseCategory];
   if (!body) throw new Error(`Character has no "${manifest.baseCategory}" part`);
 
-  return order.flatMap((slot) => {
-    const { category, front } = slotCategory(slot);
-    const part = character.parts[category];
+  return order.flatMap((categoryId) => {
+    const part = character.parts[categoryId];
     if (!part) return [];
-    const variant = manifest.categories[category]?.variants.find((option) => option.id === part.variant);
-    if (!variant) throw new Error(`Unknown ${category} variant "${part.variant}"`);
-    if (front) {
-      const file = variant.frontFiles?.[body.variant];
-      return file ? [{ slot, category, file, tint: part.tint }] : [];
-    }
-    const file = variant.files[category === manifest.baseCategory ? part.variant : body.variant];
-    if (!file) throw new Error(`No ${category}/${part.variant} sheet for body "${body.variant}"`);
-    return [{ slot, category, file, tint: part.tint }];
+    const variant = manifest.categories[categoryId]?.variants.find((option) => option.id === part.variant);
+    if (!variant) throw new Error(`Unknown ${categoryId} variant "${part.variant}"`);
+    const file = variant.files[categoryId === manifest.baseCategory ? part.variant : body.variant];
+    if (!file) throw new Error(`No ${categoryId}/${part.variant} sheet for body "${body.variant}"`);
+    return [{ category: categoryId, file, tint: part.tint }];
   });
 }

@@ -1,12 +1,11 @@
 import type { CaptureConfig } from "./config";
 import type { Direction } from "./directions";
 import type { Point, SheetLayout, Size } from "./layout";
-import { sheetFile, type CategoryId, type DrawSlot, type PartCatalog, type TintGroup } from "./parts";
+import { sheetFile, type CategoryId, type PartCatalog, type TintGroup } from "./parts";
 
 interface ManifestVariant {
   id: string;
   files: Record<string, string>;
-  frontFiles?: Record<string, string>;
 }
 
 interface ManifestCategory {
@@ -31,7 +30,7 @@ export interface Manifest {
   animations: Record<string, ManifestAnimation>;
   baseCategory: CategoryId;
   categories: Partial<Record<CategoryId, ManifestCategory>>;
-  drawOrder: Partial<Record<Direction, DrawSlot[]>>;
+  drawOrder: Partial<Record<Direction, CategoryId[]>>;
 }
 
 interface ManifestInput {
@@ -81,11 +80,6 @@ export function buildManifest({ config, layout, animations, catalog }: ManifestI
                 sheetFile(catalog, category.id, variant.id, bodyId),
               ]),
             ),
-            ...(variant.front && {
-              frontFiles: Object.fromEntries(
-                bodyIds.map((bodyId) => [bodyId, sheetFile(catalog, category.id, variant.id, bodyId, true)]),
-              ),
-            }),
           })),
         },
       ]),

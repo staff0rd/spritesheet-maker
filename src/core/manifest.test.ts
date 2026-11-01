@@ -76,25 +76,6 @@ describe("buildManifest", () => {
     });
   });
 
-  it("lists front sheets per body only for variants with a front layer", () => {
-    const manifest = buildManifest({
-      config: DEFAULT_CAPTURE_CONFIG,
-      layout,
-      animations: { idle: { frames: [0], fps: 3 } },
-      catalog: PART_CATALOG,
-    });
-    const hair = manifest.categories.hair!.variants;
-
-    expect(hair.find((variant) => variant.id === "long")!.frontFiles).toEqual({
-      slim: "hair/long.front.slim.png",
-      average: "hair/long.front.average.png",
-      broad: "hair/long.front.broad.png",
-    });
-    expect(hair.filter((variant) => variant.frontFiles).map((variant) => variant.id)).toEqual(["long"]);
-    expect(manifest.drawOrder.SE).toEqual(["body", "shoes", "bottom", "hair", "top", "hair.front", "hat"]);
-    expect(manifest.drawOrder.NE).toEqual(["body", "shoes", "bottom", "top", "hair", "hair.front", "hat"]);
-  });
-
   it("is identical for the same seed and catalog", () => {
     const build = () =>
       JSON.stringify(

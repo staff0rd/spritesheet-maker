@@ -81,13 +81,7 @@ const CURTAIN_ARM_GAP = 0.01;
 const CURTAIN_TIP_TAPER = 0.85;
 const CROWN_ANGLES = [0, 0.12, 0.24, 0.34, 0.42, 0.5].map((fraction) => fraction * Math.PI);
 
-const LOCK_COLUMNS = 4;
-const LOCK_ROW_SPACING = 0.04;
-const LOCK_HALF_WIDTH = 0.035;
-const LOCK_BULGE = 0.01;
-const LOCK_TOP_DROP = 0.04;
-
-function clothedDepth(shape: BodyShape, x: number, y: number): number {
+function backClearance(shape: BodyShape, x: number, y: number): number {
   let depth = 0;
   const torsoTop = Math.max(...shape.torso.map(([, profileY]) => profileY)) + THICKEST_TOP;
   if (y <= torsoTop) {
@@ -99,43 +93,11 @@ function clothedDepth(shape: BodyShape, x: number, y: number): number {
     const radius = MathUtils.lerp(lowRadius, highRadius, (y - lowY) / (highY - lowY));
     if (Math.abs(x) < radius) depth = Math.max(depth, Math.sqrt(radius ** 2 - x ** 2));
   }
-  return depth;
-}
-
-function backClearance(shape: BodyShape, x: number, y: number): number {
-  let depth = clothedDepth(shape, x, y);
   const [, hoodY, hoodZ] = hoodCentre(shape);
   const [hoodX, hoodHeight, hoodDepth] = HOOD_SCALE.map((scale) => scale * HOOD_RADIUS);
   const insideHood = 1 - (x / hoodX) ** 2 - ((y - hoodY) / hoodHeight) ** 2;
   if (insideHood > 0) depth = Math.max(depth, -hoodZ + hoodDepth * Math.sqrt(insideHood));
   return depth > 0 ? depth + CURTAIN_AIR : 0;
-}
-
-function frontClearance(shape: BodyShape, x: number, y: number): number {
-  const depth = clothedDepth(shape, x, y);
-  return depth > 0 ? depth + CURTAIN_AIR : 0;
-}
-
-function lockRows(shape: BodyShape, length: number, side: 1 | -1): Vector3[][] {
-  const headX = HAIR_RADIUS * shape.skull.scale[0];
-  const armInner = shape.shoulder.x - shape.upperArm.top - CURTAIN_ARM_GAP;
-  const centre = (shape.neck.radius + armInner) / 2;
-  const torsoTop = Math.max(...shape.torso.map(([, y]) => y));
-  const top = shape.skull.y - LOCK_TOP_DROP;
-  const bottom = shape.skull.y - length;
-  const steps = Math.ceil((top - bottom) / LOCK_ROW_SPACING);
-
-  return Array.from({ length: steps + 1 }, (_, step) => {
-    const y = MathUtils.lerp(top, bottom, step / steps);
-    const settle = MathUtils.smoothstep(y, torsoTop - 0.04, top);
-    const halfWidth = LOCK_HALF_WIDTH * MathUtils.lerp(1, 0.6, settle) * (step === steps ? CURTAIN_TIP_TAPER : 1);
-    const middle = Math.min(MathUtils.lerp(centre, headX * 0.9, settle), armInner - halfWidth);
-    return Array.from({ length: LOCK_COLUMNS + 1 }, (_, column) => {
-      const across = (2 * column) / LOCK_COLUMNS - 1;
-      const x = side * (middle + across * halfWidth);
-      return new Vector3(x, y, frontClearance(shape, x, y) + LOCK_BULGE * (1 - across ** 2));
-    });
-  });
 }
 
 function curtainRow(gap: number, point: (phi: number) => Vector3): Vector3[] {
@@ -199,9 +161,6 @@ function buildLong({ rig: { shape }, material, add }: BuildContext, params: Long
   const doubleSided = material.clone();
   doubleSided.side = DoubleSide;
   add("head", mesh(gridGeometry(curtainRows(shape, params.length)), doubleSided, "hair"));
-  for (const side of [1, -1] as const) {
-    add("head", mesh(gridGeometry(lockRows(shape, params.length, side)), doubleSided, "lock"), "front");
-  }
 }
 
 type SpikyParams = { spikes: number; spikeLength: number };

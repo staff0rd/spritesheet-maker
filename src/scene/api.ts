@@ -7,7 +7,6 @@ export interface RenderSheetRequest {
   poses: Pose[];
   body: PartSpec;
   part?: PartSpec;
-  front?: boolean;
 }
 
 interface SceneApi {
