@@ -7,6 +7,7 @@ import { DEFAULT_CAPTURE_CONFIG } from "../src/core/config";
 import { computeSheetLayout } from "../src/core/layout";
 import { buildManifest } from "../src/core/manifest";
 import { planSheets, validateCatalog } from "../src/core/parts";
+import { RENDER_STYLES } from "../src/core/style";
 import { CLIPS, sheetFrames } from "../src/scene/animation";
 import type { RenderSheetRequest } from "../src/scene/api";
 
@@ -40,21 +41,24 @@ async function main(): Promise<void> {
     await page.goto(url);
     await page.waitForFunction(() => window.spritesheet !== undefined);
 
-    for (const job of jobs) {
-      const request: RenderSheetRequest = {
-        config: DEFAULT_CAPTURE_CONFIG,
-        poses,
-        body: job.body,
-        part: job.part,
-      };
-      const dataUrl = await page.evaluate((req) => window.spritesheet!.renderSheet(req), request);
-      const path = resolve(OUT_DIR, job.file);
-      await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, decodePngDataUrl(dataUrl));
+    for (const style of RENDER_STYLES) {
+      const styleDir = resolve(OUT_DIR, style);
+      for (const job of jobs) {
+        const request: RenderSheetRequest = {
+          config: DEFAULT_CAPTURE_CONFIG,
+          poses,
+          body: job.body,
+          part: job.part,
+          style,
+        };
+        const dataUrl = await page.evaluate((req) => window.spritesheet!.renderSheet(req), request);
+        const path = resolve(styleDir, job.file);
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, decodePngDataUrl(dataUrl));
+      }
+      await writeFile(resolve(styleDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+      console.log(`Wrote ${jobs.length} sheets and manifest.json to ${styleDir}`);
     }
-
-    await writeFile(resolve(OUT_DIR, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-    console.log(`Wrote ${jobs.length} sheets and manifest.json to ${OUT_DIR}`);
   } finally {
     await browser.close();
     await server.close();

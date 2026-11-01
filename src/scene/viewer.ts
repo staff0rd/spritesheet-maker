@@ -90,10 +90,8 @@ export function mountViewer(container: HTMLElement, initialStyle: RenderStyle): 
   const sheets = document.createElement("a");
   sheets.textContent = "View rendered sheets";
   const crowd = document.createElement("a");
-  crowd.href = "/preview.html";
   crowd.textContent = "Crowd preview (from out/)";
   const phaser = document.createElement("a");
-  phaser.href = "/phaser.html";
   phaser.textContent = "Phaser crowd (from out/)";
   panel.append(labelled("seed", seed), randomise, sheets, crowd, phaser);
 
@@ -128,6 +126,8 @@ export function mountViewer(container: HTMLElement, initialStyle: RenderStyle): 
     }
     const { body, parts } = selected();
     sheets.href = `?view=sheets&style=${style.value}`;
+    crowd.href = `/preview.html?style=${style.value}`;
+    phaser.href = `/phaser.html?style=${style.value}`;
     character = buildDressedCharacter(proceduralProvider, Number(seed.value) || 0, body, parts, style.value as RenderStyle);
     scene.add(character.root);
   }

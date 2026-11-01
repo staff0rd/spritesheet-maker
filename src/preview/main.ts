@@ -2,6 +2,7 @@ import { layersFor, pickCharacter, type Layer } from "../core/compose";
 import type { Direction } from "../core/directions";
 import type { Manifest } from "../core/manifest";
 import { createRandom } from "../core/random";
+import { manifestUrl, missingManifestMessage, parseRenderStyle, RENDER_STYLES, type RenderStyle } from "../core/style";
 
 const COLUMNS = 12;
 const ROWS = 10;
@@ -18,6 +19,7 @@ const reseedButton = element<HTMLButtonElement>("reseed");
 const directionSelect = element<HTMLSelectElement>("direction");
 const scaleSelect = element<HTMLSelectElement>("scale");
 const animationSelect = element<HTMLSelectElement>("animation");
+const styleSelect = element<HTMLSelectElement>("style");
 const status = element<HTMLSpanElement>("status");
 const fpsLabel = element<HTMLSpanElement>("fps");
 const canvas = element<HTMLCanvasElement>("crowd");
@@ -150,32 +152,61 @@ async function render(manifest: Manifest, loadSheet: (file: string) => Promise<H
   animationHandle = requestAnimationFrame(draw);
 
   status.textContent = `${crowd.length} characters · ${files.length} sheets`;
+  status.style.color = "";
   const params = new URLSearchParams(location.search);
+  params.set("style", styleSelect.value);
   params.set("seed", String(seed));
   params.set("animation", animationSelect.value);
   history.replaceState(null, "", `?${params}`);
 }
 
+interface LoadedStyle {
+  manifest: Manifest;
+  loadSheet: (file: string) => Promise<HTMLImageElement>;
+}
+
+async function loadStyle(params: URLSearchParams, style: RenderStyle): Promise<LoadedStyle> {
+  const url = manifestUrl(params, style, location.href);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(missingManifestMessage(url, response.status, style));
+  return { manifest: (await response.json()) as Manifest, loadSheet: createSheetLoader(url) };
+}
+
 async function start(): Promise<void> {
   const params = new URLSearchParams(location.search);
-  const manifestUrl = new URL(params.get("manifest") ?? "/out/manifest.json", location.href);
   if (params.has("seed")) seedInput.value = params.get("seed")!;
+  for (const option of RENDER_STYLES) styleSelect.add(new Option(option, option));
+  styleSelect.value = parseRenderStyle(params.get("style"));
 
-  const response = await fetch(manifestUrl);
-  if (!response.ok) throw new Error(`Could not load ${manifestUrl} (${response.status}). Run npm run generate first.`);
-  const manifest = (await response.json()) as Manifest;
-  const loadSheet = createSheetLoader(manifestUrl);
+  const styles = new Map<RenderStyle, Promise<LoadedStyle>>();
+  const current = (): Promise<LoadedStyle> => {
+    const style = parseRenderStyle(styleSelect.value);
+    let loaded = styles.get(style);
+    if (!loaded) {
+      loaded = loadStyle(params, style);
+      loaded.catch(() => styles.delete(style));
+      styles.set(style, loaded);
+    }
+    return loaded;
+  };
+
+  const { manifest } = await current();
   for (const direction of manifest.directions) directionSelect.add(new Option(direction, direction));
   for (const name of Object.keys(manifest.animations)) animationSelect.add(new Option(name, name));
   animationSelect.value = params.get("animation") ?? ("walk" in manifest.animations ? "walk" : animationSelect.value);
 
-  const rerender = () => render(manifest, loadSheet).catch(showError);
+  const rerender = (): Promise<void> =>
+    current()
+      .then(({ manifest, loadSheet }) => render(manifest, loadSheet))
+      .catch(showError);
   reseedButton.addEventListener("click", () => {
     seedInput.value = String(Math.floor(Math.random() * 1_000_000));
     rerender();
   });
-  for (const control of [seedInput, directionSelect, scaleSelect, animationSelect]) control.addEventListener("change", rerender);
-  await render(manifest, loadSheet);
+  for (const control of [seedInput, directionSelect, scaleSelect, animationSelect, styleSelect]) {
+    control.addEventListener("change", rerender);
+  }
+  await rerender();
 }
 
 function showError(error: unknown): void {
