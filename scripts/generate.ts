@@ -7,10 +7,10 @@ import { DEFAULT_CAPTURE_CONFIG } from "../src/core/config";
 import { computeSheetLayout } from "../src/core/layout";
 import { buildManifest } from "../src/core/manifest";
 import { planSheets, validateCatalog } from "../src/core/parts";
+import { CLIPS, sheetFrames } from "../src/scene/animation";
 import type { RenderSheetRequest } from "../src/scene/api";
 
 const OUT_DIR = resolve(process.argv[2] ?? "out");
-const FRAMES_PER_DIRECTION = 1;
 
 function decodePngDataUrl(dataUrl: string): Buffer {
   const prefix = "data:image/png;base64,";
@@ -21,13 +21,9 @@ function decodePngDataUrl(dataUrl: string): Buffer {
 async function main(): Promise<void> {
   validateCatalog(PART_CATALOG, DEFAULT_CAPTURE_CONFIG.directions);
   const jobs = planSheets(PART_CATALOG);
-  const layout = computeSheetLayout(DEFAULT_CAPTURE_CONFIG.frameSize, DEFAULT_CAPTURE_CONFIG.directions, FRAMES_PER_DIRECTION);
-  const manifest = buildManifest({
-    config: DEFAULT_CAPTURE_CONFIG,
-    layout,
-    animations: { idle: { frames: [0] } },
-    catalog: PART_CATALOG,
-  });
+  const { poses, animations } = sheetFrames(CLIPS);
+  const layout = computeSheetLayout(DEFAULT_CAPTURE_CONFIG.frameSize, DEFAULT_CAPTURE_CONFIG.directions, poses.length);
+  const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations, catalog: PART_CATALOG });
 
   const server = await createServer({ logLevel: "error", server: { port: 0, strictPort: false } });
   await server.listen();
@@ -47,7 +43,7 @@ async function main(): Promise<void> {
     for (const job of jobs) {
       const request: RenderSheetRequest = {
         config: DEFAULT_CAPTURE_CONFIG,
-        framesPerDirection: FRAMES_PER_DIRECTION,
+        poses,
         body: job.body,
         part: job.part,
       };

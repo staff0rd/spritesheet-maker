@@ -3,7 +3,9 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PART_CATALOG } from "../core/catalog";
 import type { CategoryId, PartSpec } from "../core/parts";
 import { createLitScene } from "./capture";
+import { applyPose, CLIPS } from "./animation";
 import { buildDressedCharacter, type TintedPart } from "./character";
+import type { Rig } from "./rig";
 import { proceduralProvider } from "./parts/procedural";
 
 const NONE = "";
@@ -92,7 +94,12 @@ export function mountViewer(container: HTMLElement): void {
   crowd.textContent = "Crowd preview (from out/)";
   panel.append(labelled("seed", seed), randomise, sheets, crowd);
 
-  let character: Group | undefined;
+  const animation = document.createElement("select");
+  animation.add(new Option("rest", NONE));
+  for (const clip of CLIPS) animation.add(new Option(clip.name, clip.name));
+  panel.append(labelled("anim", animation));
+
+  let character: Rig | undefined;
 
   function selected(): { body: TintedPart; parts: TintedPart[] } {
     const picks = PART_CATALOG.categories.flatMap((category) => {
@@ -108,12 +115,12 @@ export function mountViewer(container: HTMLElement): void {
 
   function rebuild(): void {
     if (character) {
-      scene.remove(character);
-      disposeCharacter(character);
+      scene.remove(character.root);
+      disposeCharacter(character.root);
     }
     const { body, parts } = selected();
     character = buildDressedCharacter(proceduralProvider, Number(seed.value) || 0, body, parts);
-    scene.add(character);
+    scene.add(character.root);
   }
 
   randomise.addEventListener("click", () => {
@@ -134,7 +141,9 @@ export function mountViewer(container: HTMLElement): void {
   resize();
   rebuild();
 
-  renderer.setAnimationLoop(() => {
+  renderer.setAnimationLoop((time) => {
+    const clip = CLIPS.find((candidate) => candidate.name === animation.value);
+    if (character) applyPose(character, clip ? clip.poses[Math.floor((time / 1000) * clip.fps) % clip.poses.length] : {});
     controls.update();
     renderer.render(scene, camera);
   });

@@ -47,17 +47,17 @@ describe("proceduralProvider", () => {
 
 describe("buildCharacter", () => {
   it.each(jobs.map((job) => [job.file, job] as const))("builds %s", (_, job) => {
-    const character = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part });
+    const character = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part }).root;
     expect(meshes(character).filter((mesh) => mesh.userData.layer === job.category).length).toBeGreaterThan(0);
   });
 
   it("draws the body in colour when rendering the body layer", () => {
-    const character = buildCharacter(proceduralProvider, { seed: 1, body });
+    const character = buildCharacter(proceduralProvider, { seed: 1, body }).root;
     expect(layerMaterials(character, "body").every((material) => material.colorWrite)).toBe(true);
   });
 
   it("draws the body depth-only, before the part, when rendering another layer", () => {
-    const character = buildCharacter(proceduralProvider, { seed: 1, body, part: spiky });
+    const character = buildCharacter(proceduralProvider, { seed: 1, body, part: spiky }).root;
     const bodyMeshes = meshes(character).filter((mesh) => mesh.userData.layer === "body");
 
     expect(layerMaterials(character, "body").every((material) => !material.colorWrite && material.depthWrite)).toBe(true);
@@ -67,13 +67,13 @@ describe("buildCharacter", () => {
 
   it("is deterministic for a fixed seed", () => {
     for (const job of jobs) {
-      const build = () => snapshot(buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part }));
+      const build = () => snapshot(buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part }).root);
       expect(build(), job.file).toEqual(build());
     }
   });
 
   it("varies seeded parts with the seed", () => {
-    const build = (seed: number) => snapshot(buildCharacter(proceduralProvider, { seed, body, part: spiky }));
+    const build = (seed: number) => snapshot(buildCharacter(proceduralProvider, { seed, body, part: spiky }).root);
     expect(build(1)).not.toEqual(build(2));
   });
 });

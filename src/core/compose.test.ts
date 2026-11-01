@@ -9,7 +9,7 @@ import { createRandom, type Random } from "./random";
 const manifest = buildManifest({
   config: DEFAULT_CAPTURE_CONFIG,
   layout: computeSheetLayout(DEFAULT_CAPTURE_CONFIG.frameSize, DEFAULT_CAPTURE_CONFIG.directions, 1),
-  animations: { idle: { frames: [0] } },
+  animations: { idle: { frames: [0], fps: 3 } },
   catalog: PART_CATALOG,
 });
 

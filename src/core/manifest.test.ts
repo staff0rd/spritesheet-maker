@@ -27,7 +27,7 @@ const catalog: PartCatalog = {
 
 describe("buildManifest", () => {
   it("describes the sheet, directions, animations, categories and draw order", () => {
-    const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0] } }, catalog });
+    const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0], fps: 3 } }, catalog });
 
     expect(manifest).toEqual({
       version: 1,
@@ -37,7 +37,7 @@ describe("buildManifest", () => {
       sheetSize: { width: 64, height: 384 },
       directions: ["NE", "SE", "SW", "NW"],
       directionRows: { NE: 0, SE: 1, SW: 2, NW: 3 },
-      animations: { idle: { frames: [0] } },
+      animations: { idle: { frames: [0], fps: 3 } },
       baseCategory: "body",
       categories: {
         body: {
@@ -62,7 +62,7 @@ describe("buildManifest", () => {
     const manifest = buildManifest({
       config: DEFAULT_CAPTURE_CONFIG,
       layout,
-      animations: { idle: { frames: [0] } },
+      animations: { idle: { frames: [0], fps: 3 } },
       catalog: PART_CATALOG,
     });
 
@@ -79,21 +79,27 @@ describe("buildManifest", () => {
   it("is identical for the same seed and catalog", () => {
     const build = () =>
       JSON.stringify(
-        buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0] } }, catalog: PART_CATALOG }),
+        buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0], fps: 3 } }, catalog: PART_CATALOG }),
       );
 
     expect(build()).toBe(build());
   });
 
   it("round-trips through JSON unchanged", () => {
-    const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0] } }, catalog });
+    const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0], fps: 3 } }, catalog });
 
     expect(JSON.parse(JSON.stringify(manifest))).toEqual(manifest);
   });
 
   it("rejects animation frames outside the sheet columns", () => {
     expect(() =>
-      buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { walk: { frames: [0, 1] } }, catalog }),
+      buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { walk: { frames: [0, 1], fps: 8 } }, catalog }),
     ).toThrow(/walk/);
+  });
+
+  it("rejects animations without a positive fps", () => {
+    expect(() =>
+      buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0], fps: 0 } }, catalog }),
+    ).toThrow(/fps/);
   });
 });

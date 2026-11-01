@@ -1,0 +1,70 @@
+import { Box3, Mesh } from "three";
+import { describe, expect, it } from "vitest";
+import { PART_CATALOG } from "../core/catalog";
+import { planSheets } from "../core/parts";
+import { applyPose, CLIPS, sheetFrames } from "./animation";
+import { buildCharacter } from "./character";
+import { proceduralProvider } from "./parts/procedural";
+import type { Rig } from "./rig";
+
+const bodies = planSheets(PART_CATALOG).filter((job) => !job.part);
+
+function lowestFootY(rig: Rig): number {
+  rig.root.updateMatrixWorld(true);
+  const feet: number[] = [];
+  rig.root.traverse((object) => {
+    if (object instanceof Mesh && object.name === "foot") feet.push(new Box3().setFromObject(object).min.y);
+  });
+  return Math.min(...feet);
+}
+
+describe("sheetFrames", () => {
+  it("lays clips out consecutively and records their frame indices", () => {
+    const { poses, animations } = sheetFrames(CLIPS);
+
+    expect(animations.idle.frames).toEqual([0, 1]);
+    expect(animations.walk.frames).toEqual([2, 3, 4, 5, 6, 7]);
+    expect(poses).toHaveLength(8);
+  });
+
+  it("rejects duplicate and empty clips", () => {
+    expect(() => sheetFrames([...CLIPS, CLIPS[0]])).toThrow(/Duplicate/);
+    expect(() => sheetFrames([{ name: "empty", fps: 1, poses: [] }])).toThrow(/no poses/);
+  });
+
+  it("has a 4-6 frame walk cycle that moves the limbs", () => {
+    const walk = CLIPS.find((clip) => clip.name === "walk")!;
+    expect(walk.poses.length).toBeGreaterThanOrEqual(4);
+    expect(walk.poses.length).toBeLessThanOrEqual(6);
+    expect(new Set(walk.poses.map((pose) => pose.legLeft)).size).toBeGreaterThan(2);
+  });
+});
+
+describe("applyPose", () => {
+  it.each(bodies.map((job) => [job.variant, job] as const))("keeps the %s body's feet on the ground", (_, job) => {
+    const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body });
+    const rest = lowestFootY(rig);
+    for (const pose of sheetFrames(CLIPS).poses) {
+      applyPose(rig, pose);
+      expect(lowestFootY(rig)).toBeCloseTo(rest, 1);
+    }
+  });
+
+  it("bobs the body during idle", () => {
+    const rig = buildCharacter(proceduralProvider, { seed: 1, body: bodies[0].body });
+    const idle = CLIPS.find((clip) => clip.name === "idle")!;
+    const heights = idle.poses.map((pose) => {
+      applyPose(rig, pose);
+      return rig.root.position.y;
+    });
+    expect(new Set(heights).size).toBe(idle.poses.length);
+  });
+
+  it("resets joints the pose leaves unset", () => {
+    const rig = buildCharacter(proceduralProvider, { seed: 1, body: bodies[0].body });
+    applyPose(rig, CLIPS[1].poses[1]);
+    applyPose(rig, {});
+    expect(Object.values(rig.joints).every((joint) => joint.rotation.x === 0)).toBe(true);
+    expect(rig.root.position.y).toBe(0);
+  });
+});

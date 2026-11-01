@@ -16,6 +16,7 @@ interface ManifestCategory {
 
 interface ManifestAnimation {
   frames: number[];
+  fps: number;
 }
 
 export interface Manifest {
@@ -41,6 +42,7 @@ interface ManifestInput {
 
 export function buildManifest({ config, layout, animations, catalog }: ManifestInput): Manifest {
   for (const [name, animation] of Object.entries(animations)) {
+    if (!(animation.fps > 0)) throw new Error(`Animation "${name}" must have a positive fps`);
     for (const frame of animation.frames) {
       if (!Number.isInteger(frame) || frame < 0 || frame >= layout.columns) {
         throw new Error(`Animation "${name}" references frame ${frame} outside 0..${layout.columns - 1}`);
@@ -61,7 +63,7 @@ export function buildManifest({ config, layout, animations, catalog }: ManifestI
     directions: [...config.directions],
     directionRows: Object.fromEntries(config.directions.map((direction, row) => [direction, row])),
     animations: Object.fromEntries(
-      Object.entries(animations).map(([name, { frames }]) => [name, { frames: [...frames] }]),
+      Object.entries(animations).map(([name, { frames, fps }]) => [name, { frames: [...frames], fps }]),
     ),
     baseCategory: catalog.baseCategory,
     categories: Object.fromEntries(

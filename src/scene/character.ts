@@ -1,4 +1,4 @@
-import { Color, type Group, type Material, MeshBasicMaterial, MeshLambertMaterial } from "three";
+import { Color, type Material, MeshBasicMaterial, MeshLambertMaterial } from "three";
 import { partRandom, type PartSpec } from "../core/parts";
 import type { PartProvider } from "./parts/types";
 import { bodyShape, createRig, DEFAULT_BODY_PARAMS, type Rig } from "./rig";
@@ -42,11 +42,11 @@ function rigFor(body: PartSpec): Rig {
   return createRig(bodyShape(resolveParams(DEFAULT_BODY_PARAMS, body.params, `${body.category}/${body.id}`)));
 }
 
-export function buildCharacter(provider: PartProvider, { seed, body, part }: CharacterRequest): Group {
+export function buildCharacter(provider: PartProvider, { seed, body, part }: CharacterRequest): Rig {
   const rig = rigFor(body);
   addLayer(provider, rig, body, seed, part ? { depthOnly: true } : { depthOnly: false });
   if (part) addLayer(provider, rig, part, seed, { depthOnly: false });
-  return rig.root;
+  return rig;
 }
 
 export interface TintedPart {
@@ -54,8 +54,8 @@ export interface TintedPart {
   tint: number;
 }
 
-export function buildDressedCharacter(provider: PartProvider, seed: number, body: TintedPart, parts: readonly TintedPart[]): Group {
+export function buildDressedCharacter(provider: PartProvider, seed: number, body: TintedPart, parts: readonly TintedPart[]): Rig {
   const rig = rigFor(body.spec);
   for (const { spec, tint } of [body, ...parts]) addLayer(provider, rig, spec, seed, { depthOnly: false, tint });
-  return rig.root;
+  return rig;
 }

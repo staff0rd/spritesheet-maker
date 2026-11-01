@@ -17,6 +17,7 @@ const seedInput = element<HTMLInputElement>("seed");
 const reseedButton = element<HTMLButtonElement>("reseed");
 const directionSelect = element<HTMLSelectElement>("direction");
 const scaleSelect = element<HTMLSelectElement>("scale");
+const animationSelect = element<HTMLSelectElement>("animation");
 const status = element<HTMLSpanElement>("status");
 const canvas = element<HTMLCanvasElement>("crowd");
 
@@ -62,23 +63,47 @@ function drawTinted(
   target.drawImage(scratch.canvas, 0, 0, width, height, x, y, width, height);
 }
 
+interface Walker {
+  strip: HTMLCanvasElement;
+  phase: number;
+}
+
+let animationHandle = 0;
+
 async function render(manifest: Manifest, loadSheet: (file: string) => Promise<HTMLImageElement>): Promise<void> {
+  cancelAnimationFrame(animationHandle);
   const seed = Number(seedInput.value) || 0;
   const scale = Number(scaleSelect.value);
   const fixedDirection = directionSelect.value as Direction | "";
   const { width, height } = manifest.frameSize;
-  const idleFrame = manifest.animations.idle?.frames[0] ?? 0;
+  const rowWidth = manifest.sheetSize.width;
   const random = createRandom(seed);
 
   const crowd = Array.from({ length: COLUMNS * ROWS }, () => {
     const character = pickCharacter(manifest, random);
     const direction = fixedDirection || manifest.directions[Math.floor(random() * manifest.directions.length)];
-    return { direction, layers: layersFor(manifest, character, direction) };
+    const phase = random();
+    return { direction, phase, layers: layersFor(manifest, character, direction) };
   });
 
   const sheets = new Map<string, HTMLImageElement>();
   const files = [...new Set(crowd.flatMap(({ layers }) => layers.map((layer: Layer) => layer.file)))];
   await Promise.all(files.map(async (file) => sheets.set(file, await loadSheet(file))));
+
+  const scratchCanvas = document.createElement("canvas");
+  scratchCanvas.width = rowWidth;
+  scratchCanvas.height = height;
+  const scratch = scratchCanvas.getContext("2d")!;
+
+  const walkers: Walker[] = crowd.map(({ direction, phase, layers }) => {
+    const strip = document.createElement("canvas");
+    strip.width = rowWidth;
+    strip.height = height;
+    const stripContext = strip.getContext("2d")!;
+    const source = { x: 0, y: manifest.directionRows[direction] * height, width: rowWidth, height };
+    for (const layer of layers) drawTinted(stripContext, scratch, sheets.get(layer.file)!, source, layer.tint, 0, 0);
+    return { strip, phase };
+  });
 
   const cellWidth = width + GAP;
   const cellHeight = height + GAP;
@@ -88,21 +113,30 @@ async function render(manifest: Manifest, loadSheet: (file: string) => Promise<H
   context.imageSmoothingEnabled = false;
   context.setTransform(scale, 0, 0, scale, 0, 0);
 
-  const scratchCanvas = document.createElement("canvas");
-  scratchCanvas.width = width;
-  scratchCanvas.height = height;
-  const scratch = scratchCanvas.getContext("2d")!;
-
-  crowd.forEach(({ direction, layers }, index) => {
-    const x = (index % COLUMNS) * cellWidth;
-    const y = Math.floor(index / COLUMNS) * cellHeight;
-    const source = { x: idleFrame * width, y: manifest.directionRows[direction] * height, width, height };
-    for (const layer of layers) drawTinted(context, scratch, sheets.get(layer.file)!, source, layer.tint, x, y);
-  });
+  const animation = manifest.animations[animationSelect.value] ?? Object.values(manifest.animations)[0];
+  if (!animation) throw new Error("Manifest has no animations");
+  let lastTick = -1;
+  const draw = (time: number) => {
+    const tick = Math.floor((time / 1000) * animation.fps);
+    if (tick !== lastTick) {
+      lastTick = tick;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      walkers.forEach(({ strip, phase }, index) => {
+        const frames = animation.frames;
+        const frame = frames[(tick + Math.floor(phase * frames.length)) % frames.length];
+        const x = (index % COLUMNS) * cellWidth;
+        const y = Math.floor(index / COLUMNS) * cellHeight;
+        context.drawImage(strip, frame * width, 0, width, height, x, y, width, height);
+      });
+    }
+    animationHandle = requestAnimationFrame(draw);
+  };
+  animationHandle = requestAnimationFrame(draw);
 
   status.textContent = `${crowd.length} characters · ${files.length} sheets`;
   const params = new URLSearchParams(location.search);
   params.set("seed", String(seed));
+  params.set("animation", animationSelect.value);
   history.replaceState(null, "", `?${params}`);
 }
 
@@ -116,13 +150,15 @@ async function start(): Promise<void> {
   const manifest = (await response.json()) as Manifest;
   const loadSheet = createSheetLoader(manifestUrl);
   for (const direction of manifest.directions) directionSelect.add(new Option(direction, direction));
+  for (const name of Object.keys(manifest.animations)) animationSelect.add(new Option(name, name));
+  animationSelect.value = params.get("animation") ?? ("walk" in manifest.animations ? "walk" : animationSelect.value);
 
   const rerender = () => render(manifest, loadSheet).catch(showError);
   reseedButton.addEventListener("click", () => {
     seedInput.value = String(Math.floor(Math.random() * 1_000_000));
     rerender();
   });
-  for (const control of [seedInput, directionSelect, scaleSelect]) control.addEventListener("change", rerender);
+  for (const control of [seedInput, directionSelect, scaleSelect, animationSelect]) control.addEventListener("change", rerender);
   await render(manifest, loadSheet);
 }
 

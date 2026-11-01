@@ -1,9 +1,10 @@
 import type { CaptureConfig } from "../core/config";
 import type { PartSpec } from "../core/parts";
+import type { Pose } from "./animation";
 
 export interface RenderSheetRequest {
   config: CaptureConfig;
-  framesPerDirection: number;
+  poses: Pose[];
   body: PartSpec;
   part?: PartSpec;
 }

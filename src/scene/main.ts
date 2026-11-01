@@ -1,6 +1,7 @@
 import { PART_CATALOG } from "../core/catalog";
 import { DEFAULT_CAPTURE_CONFIG } from "../core/config";
 import { planSheets } from "../core/parts";
+import { CLIPS, sheetFrames } from "./animation";
 import { renderSheet } from "./capture";
 import { mountViewer } from "./viewer";
 
@@ -17,11 +18,12 @@ function showSheets(): void {
   grid.style.gap = "12px";
   document.body.append(back, grid);
 
+  const { poses } = sheetFrames(CLIPS);
   for (const job of planSheets(PART_CATALOG)) {
     const figure = document.createElement("figure");
     figure.style.margin = "0";
     const preview = document.createElement("img");
-    preview.src = renderSheet({ config: DEFAULT_CAPTURE_CONFIG, framesPerDirection: 1, body: job.body, part: job.part });
+    preview.src = renderSheet({ config: DEFAULT_CAPTURE_CONFIG, poses, body: job.body, part: job.part });
     preview.style.imageRendering = "pixelated";
     preview.style.height = "384px";
     const caption = document.createElement("figcaption");

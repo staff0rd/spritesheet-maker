@@ -1,6 +1,7 @@
 import { DirectionalLight, HemisphereLight, Mesh, Scene, WebGLRenderer } from "three";
 import { facingYaw } from "../core/directions";
 import { computeSheetLayout, type Size } from "../core/layout";
+import { applyPose } from "./animation";
 import type { RenderSheetRequest } from "./api";
 import { createIsometricCamera } from "./camera";
 import { buildCharacter } from "./character";
@@ -34,12 +35,13 @@ function dispose(scene: Scene): void {
   });
 }
 
-export function renderSheet({ config, framesPerDirection, body, part }: RenderSheetRequest): string {
-  const layout = computeSheetLayout(config.frameSize, config.directions, framesPerDirection);
+export function renderSheet({ config, poses, body, part }: RenderSheetRequest): string {
+  const layout = computeSheetLayout(config.frameSize, config.directions, poses.length);
   const renderer = rendererFor(config.frameSize);
   const scene = createLitScene();
   const camera = createIsometricCamera(config);
-  const character = buildCharacter(proceduralProvider, { seed: config.seed, body, part });
+  const rig = buildCharacter(proceduralProvider, { seed: config.seed, body, part });
+  const character = rig.root;
   scene.add(character);
 
   const sheet = document.createElement("canvas");
@@ -50,6 +52,7 @@ export function renderSheet({ config, framesPerDirection, body, part }: RenderSh
 
   for (const rect of layout.frames) {
     character.rotation.y = facingYaw(rect.direction);
+    applyPose(rig, poses[rect.frame]);
     renderer.render(scene, camera);
     context.drawImage(renderer.domElement, rect.x, rect.y, rect.width, rect.height);
   }
