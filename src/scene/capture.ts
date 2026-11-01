@@ -1,9 +1,20 @@
-import { DirectionalLight, HemisphereLight, Scene, WebGLRenderer } from "three";
+import { DirectionalLight, HemisphereLight, Mesh, Scene, WebGLRenderer } from "three";
 import { facingYaw } from "../core/directions";
-import { computeSheetLayout } from "../core/layout";
+import { computeSheetLayout, type Size } from "../core/layout";
 import type { RenderSheetRequest } from "./api";
-import { buildBody } from "./body";
 import { createIsometricCamera } from "./camera";
+import { buildCharacter } from "./character";
+import { proceduralProvider } from "./parts/procedural";
+
+let sharedRenderer: WebGLRenderer | undefined;
+
+function rendererFor(frameSize: Size): WebGLRenderer {
+  sharedRenderer ??= new WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+  sharedRenderer.setPixelRatio(1);
+  sharedRenderer.setSize(frameSize.width, frameSize.height, false);
+  sharedRenderer.setClearColor(0x000000, 0);
+  return sharedRenderer;
+}
 
 function createLitScene(): Scene {
   const scene = new Scene();
@@ -14,17 +25,22 @@ function createLitScene(): Scene {
   return scene;
 }
 
-export function renderSheet({ config, framesPerDirection }: RenderSheetRequest): string {
-  const layout = computeSheetLayout(config.frameSize, config.directions, framesPerDirection);
-  const renderer = new WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
-  renderer.setPixelRatio(1);
-  renderer.setSize(config.frameSize.width, config.frameSize.height, false);
-  renderer.setClearColor(0x000000, 0);
+function dispose(scene: Scene): void {
+  scene.traverse((object) => {
+    if (object instanceof Mesh) {
+      object.geometry.dispose();
+      for (const material of [object.material].flat()) material.dispose();
+    }
+  });
+}
 
+export function renderSheet({ config, framesPerDirection, body, part }: RenderSheetRequest): string {
+  const layout = computeSheetLayout(config.frameSize, config.directions, framesPerDirection);
+  const renderer = rendererFor(config.frameSize);
   const scene = createLitScene();
   const camera = createIsometricCamera(config);
-  const body = buildBody();
-  scene.add(body);
+  const character = buildCharacter(proceduralProvider, { seed: config.seed, body, part });
+  scene.add(character);
 
   const sheet = document.createElement("canvas");
   sheet.width = layout.sheetSize.width;
@@ -33,11 +49,11 @@ export function renderSheet({ config, framesPerDirection }: RenderSheetRequest):
   if (!context) throw new Error("2D canvas context unavailable");
 
   for (const rect of layout.frames) {
-    body.rotation.y = facingYaw(rect.direction);
+    character.rotation.y = facingYaw(rect.direction);
     renderer.render(scene, camera);
     context.drawImage(renderer.domElement, rect.x, rect.y, rect.width, rect.height);
   }
 
-  renderer.dispose();
+  dispose(scene);
   return sheet.toDataURL("image/png");
 }

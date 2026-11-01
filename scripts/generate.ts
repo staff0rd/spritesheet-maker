@@ -1,10 +1,12 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
+import { PART_CATALOG } from "../src/core/catalog";
 import { DEFAULT_CAPTURE_CONFIG } from "../src/core/config";
 import { computeSheetLayout } from "../src/core/layout";
 import { buildManifest } from "../src/core/manifest";
+import { planSheets, validateCatalog } from "../src/core/parts";
 import type { RenderSheetRequest } from "../src/scene/api";
 
 const OUT_DIR = resolve(process.argv[2] ?? "out");
@@ -17,6 +19,16 @@ function decodePngDataUrl(dataUrl: string): Buffer {
 }
 
 async function main(): Promise<void> {
+  validateCatalog(PART_CATALOG, DEFAULT_CAPTURE_CONFIG.directions);
+  const jobs = planSheets(PART_CATALOG);
+  const layout = computeSheetLayout(DEFAULT_CAPTURE_CONFIG.frameSize, DEFAULT_CAPTURE_CONFIG.directions, FRAMES_PER_DIRECTION);
+  const manifest = buildManifest({
+    config: DEFAULT_CAPTURE_CONFIG,
+    layout,
+    animations: { idle: { frames: [0] } },
+    catalog: PART_CATALOG,
+  });
+
   const server = await createServer({ logLevel: "error", server: { port: 0, strictPort: false } });
   await server.listen();
   const url = server.resolvedUrls?.local[0];
@@ -32,24 +44,21 @@ async function main(): Promise<void> {
     await page.goto(url);
     await page.waitForFunction(() => window.spritesheet !== undefined);
 
-    const request: RenderSheetRequest = {
-      config: DEFAULT_CAPTURE_CONFIG,
-      framesPerDirection: FRAMES_PER_DIRECTION,
-    };
-    const dataUrl = await page.evaluate((req) => window.spritesheet!.renderSheet(req), request);
+    for (const job of jobs) {
+      const request: RenderSheetRequest = {
+        config: DEFAULT_CAPTURE_CONFIG,
+        framesPerDirection: FRAMES_PER_DIRECTION,
+        body: job.body,
+        part: job.part,
+      };
+      const dataUrl = await page.evaluate((req) => window.spritesheet!.renderSheet(req), request);
+      const path = resolve(OUT_DIR, job.file);
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, decodePngDataUrl(dataUrl));
+    }
 
-    const layout = computeSheetLayout(DEFAULT_CAPTURE_CONFIG.frameSize, DEFAULT_CAPTURE_CONFIG.directions, FRAMES_PER_DIRECTION);
-    const manifest = buildManifest({
-      config: DEFAULT_CAPTURE_CONFIG,
-      layout,
-      animations: { idle: { frames: [0] } },
-      categories: { body: [{ id: "body", file: "body.png" }] },
-    });
-
-    await mkdir(OUT_DIR, { recursive: true });
-    await writeFile(resolve(OUT_DIR, "body.png"), decodePngDataUrl(dataUrl));
     await writeFile(resolve(OUT_DIR, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-    console.log(`Wrote body.png and manifest.json to ${OUT_DIR}`);
+    console.log(`Wrote ${jobs.length} sheets and manifest.json to ${OUT_DIR}`);
   } finally {
     await browser.close();
     await server.close();

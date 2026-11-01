@@ -1,18 +1,33 @@
 import { describe, expect, it } from "vitest";
+import { PART_CATALOG } from "./catalog";
 import { DEFAULT_CAPTURE_CONFIG } from "./config";
 import { computeSheetLayout } from "./layout";
 import { buildManifest } from "./manifest";
+import type { PartCatalog } from "./parts";
 
 const layout = computeSheetLayout(DEFAULT_CAPTURE_CONFIG.frameSize, DEFAULT_CAPTURE_CONFIG.directions, 1);
 
+const order = ["body", "top"] as const;
+const catalog: PartCatalog = {
+  baseCategory: "body",
+  categories: [
+    {
+      id: "body",
+      tintGroup: "skin",
+      optional: false,
+      variants: [
+        { id: "slim", kind: "humanoid", params: {} },
+        { id: "broad", kind: "humanoid", params: {} },
+      ],
+    },
+    { id: "top", tintGroup: "cloth", optional: true, variants: [{ id: "tshirt", kind: "shirt", params: {} }] },
+  ],
+  drawOrder: { NE: order, SE: order, SW: order, NW: order },
+};
+
 describe("buildManifest", () => {
-  it("describes the sheet, directions, animations and categories", () => {
-    const manifest = buildManifest({
-      config: DEFAULT_CAPTURE_CONFIG,
-      layout,
-      animations: { idle: { frames: [0] } },
-      categories: { body: [{ id: "body", file: "body.png" }] },
-    });
+  it("describes the sheet, directions, animations, categories and draw order", () => {
+    const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0] } }, catalog });
 
     expect(manifest).toEqual({
       version: 1,
@@ -23,29 +38,62 @@ describe("buildManifest", () => {
       directions: ["NE", "SE", "SW", "NW"],
       directionRows: { NE: 0, SE: 1, SW: 2, NW: 3 },
       animations: { idle: { frames: [0] } },
-      categories: { body: { variants: [{ id: "body", file: "body.png" }] } },
+      baseCategory: "body",
+      categories: {
+        body: {
+          tintGroup: "skin",
+          optional: false,
+          variants: [
+            { id: "slim", files: { slim: "body/slim.png" } },
+            { id: "broad", files: { broad: "body/broad.png" } },
+          ],
+        },
+        top: {
+          tintGroup: "cloth",
+          optional: true,
+          variants: [{ id: "tshirt", files: { slim: "top/tshirt.slim.png", broad: "top/tshirt.broad.png" } }],
+        },
+      },
+      drawOrder: { NE: ["body", "top"], SE: ["body", "top"], SW: ["body", "top"], NW: ["body", "top"] },
     });
   });
 
-  it("round-trips through JSON unchanged", () => {
+  it("assigns tint groups to every category in the default catalog", () => {
     const manifest = buildManifest({
       config: DEFAULT_CAPTURE_CONFIG,
       layout,
       animations: { idle: { frames: [0] } },
-      categories: { body: [{ id: "body", file: "body.png" }] },
+      catalog: PART_CATALOG,
     });
+
+    expect(Object.fromEntries(Object.entries(manifest.categories).map(([id, category]) => [id, category.tintGroup]))).toEqual({
+      body: "skin",
+      hair: "hair",
+      top: "cloth",
+      bottom: "cloth",
+      shoes: "cloth",
+      hat: "cloth",
+    });
+  });
+
+  it("is identical for the same seed and catalog", () => {
+    const build = () =>
+      JSON.stringify(
+        buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0] } }, catalog: PART_CATALOG }),
+      );
+
+    expect(build()).toBe(build());
+  });
+
+  it("round-trips through JSON unchanged", () => {
+    const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0] } }, catalog });
 
     expect(JSON.parse(JSON.stringify(manifest))).toEqual(manifest);
   });
 
   it("rejects animation frames outside the sheet columns", () => {
     expect(() =>
-      buildManifest({
-        config: DEFAULT_CAPTURE_CONFIG,
-        layout,
-        animations: { walk: { frames: [0, 1] } },
-        categories: {},
-      }),
+      buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { walk: { frames: [0, 1] } }, catalog }),
     ).toThrow(/walk/);
   });
 });

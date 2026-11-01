@@ -1,0 +1,58 @@
+import { LatheGeometry, type Material, Mesh, type BufferGeometry, Vector2 } from "three";
+import type { Profile, Segment } from "../rig";
+
+export function mesh(geometry: BufferGeometry, material: Material, name: string): Mesh {
+  const result = new Mesh(geometry, material);
+  result.name = name;
+  return result;
+}
+
+export function latheMesh(profile: Profile, segments: number, material: Material, name: string, depthScale = 1): Mesh {
+  const geometry = new LatheGeometry(
+    profile.map(([radius, y]) => new Vector2(radius, y)),
+    segments,
+  );
+  geometry.scale(1, 1, depthScale);
+  return mesh(geometry, material, name);
+}
+
+export function segmentProfile({ length, top, bottom }: Segment): Profile {
+  return [
+    [0, -length],
+    [bottom, -length],
+    [top, 0],
+    [0, 0],
+  ];
+}
+
+export function radiusAt(profile: Profile, y: number): number {
+  const rim = profile.filter(([radius]) => radius > 0);
+  if (y <= rim[0][1]) return rim[0][0];
+  for (let index = 1; index < rim.length; index++) {
+    const [r1, y1] = rim[index];
+    if (y <= y1) {
+      const [r0, y0] = rim[index - 1];
+      return r0 + ((r1 - r0) * (y - y0)) / (y1 - y0);
+    }
+  }
+  return rim[rim.length - 1][0];
+}
+
+export function enclosingShell(profile: Profile, fromY: number, toY: number, margin: number): Profile {
+  const ys = profile.map(([, y]) => y);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const low = Math.max(fromY, minY);
+  const high = Math.min(toY, maxY);
+  const inner = profile.filter(([radius, y]) => radius > 0 && y > low && y < high);
+  const points: [number, number][] = [[radiusAt(profile, low), low], ...inner, [radiusAt(profile, high), high]].map(
+    ([radius, y]) => [radius + margin, y],
+  );
+  if (fromY <= minY) points.unshift([0, minY - margin]);
+  if (toY >= maxY) points.push([0, maxY + margin]);
+  return points;
+}
+
+export function segmentShell(segment: Segment, fromFraction: number, toFraction: number, margin: number): Profile {
+  return enclosingShell(segmentProfile(segment), -toFraction * segment.length, -fromFraction * segment.length, margin);
+}
