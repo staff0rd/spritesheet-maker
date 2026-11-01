@@ -17,7 +17,7 @@
         background: #2a2d33;
         color: #ddd;
       }
-      nav {
+      form {
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
@@ -34,11 +34,19 @@
     </style>
   </head>
   <body>
-    <nav>
+    <form id="controls">
       <a href="/">← 3D viewer</a>
       <a href="/preview.html">Crowd preview</a>
+      <label>Seed <input id="seed" type="number" value="1" style="width: 90px" /></label>
+      <button id="reseed" type="button">Reseed</button>
+      <label>
+        Crowd
+        <input id="count" type="range" min="50" max="2000" step="50" />
+        <output id="count-label" style="font-variant-numeric: tabular-nums"></output>
+      </label>
       <span id="status"></span>
-    </nav>
+      <span id="fps" style="font-variant-numeric: tabular-nums"></span>
+    </form>
     <div id="game"></div>
     <script type="module" src="/src/phaser/main.ts"></script>
   </body>

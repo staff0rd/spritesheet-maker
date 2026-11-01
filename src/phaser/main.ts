@@ -5,6 +5,7 @@ import type { Manifest } from "../core/manifest";
 import { createRandom, hashString, type Random } from "../core/random";
 import {
   animationFrame,
+  crowdSize,
   diamondPoint,
   frameIndex,
   stepWander,
@@ -13,7 +14,6 @@ import {
   type Wanderer,
 } from "./crowd";
 
-const CROWD_SIZE = 120;
 const MAX_STEP_SECONDS = 0.1;
 const WANDER: WanderConfig = {
   floor: { halfWidth: 480, halfHeight: 240 },
@@ -51,12 +51,17 @@ function element<T extends HTMLElement>(id: string): T {
 }
 
 const status = element<HTMLSpanElement>("status");
+const fpsLabel = element<HTMLSpanElement>("fps");
+const seedInput = element<HTMLInputElement>("seed");
+const reseedButton = element<HTMLButtonElement>("reseed");
+const countInput = element<HTMLInputElement>("count");
+const countLabel = element<HTMLOutputElement>("count-label");
 
-function planCrowd(manifest: Manifest, seed: number): CrowdMember[] {
+function planCrowd(manifest: Manifest, seed: number, size: number): CrowdMember[] {
   const random = createRandom(seed);
   const placement = createRandom(hashString(`floor:${seed}`));
   const { halfWidth, halfHeight } = WANDER.floor;
-  return Array.from({ length: CROWD_SIZE }, (_, index) => {
+  return Array.from({ length: size }, (_, index) => {
     const character = pickCharacter(manifest, random);
     const direction = manifest.directions[Math.floor(random() * manifest.directions.length)];
     const phase = random();
@@ -67,21 +72,30 @@ function planCrowd(manifest: Manifest, seed: number): CrowdMember[] {
   });
 }
 
+interface CrowdData {
+  crowd: CrowdMember[];
+}
+
 class CrowdScene extends Phaser.Scene {
   private walkers: Walker[] = [];
+  private crowd: CrowdMember[] = [];
 
   constructor(
     private readonly manifest: Manifest,
     private readonly manifestUrl: URL,
-    private readonly crowd: CrowdMember[],
   ) {
     super("crowd");
+  }
+
+  init({ crowd }: CrowdData): void {
+    this.crowd = crowd;
   }
 
   preload(): void {
     const { width, height } = this.manifest.frameSize;
     const files = new Set(this.crowd.flatMap(({ layers }) => layers.map((layer) => layer.file)));
     for (const file of files) {
+      if (this.textures.exists(file)) continue;
       this.load.spritesheet(file, new URL(file, this.manifestUrl).href, { frameWidth: width, frameHeight: height });
     }
   }
@@ -127,6 +141,7 @@ class CrowdScene extends Phaser.Scene {
     const centre = () => this.cameras.main.centerOn(0, 0);
     centre();
     this.scale.on(Phaser.Scale.Events.RESIZE, centre);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, centre));
   }
 
   update(_time: number, delta: number): void {
@@ -166,12 +181,25 @@ class CrowdScene extends Phaser.Scene {
   }
 }
 
+function readUrl(): { seed: number; size: number } {
+  const params = new URLSearchParams(location.search);
+  return { seed: Number(params.get("seed") ?? 1) || 0, size: crowdSize(params.get("count")) };
+}
+
+function writeUrl(seed: number, size: number): void {
+  const params = new URLSearchParams(location.search);
+  params.set("seed", String(seed));
+  params.set("count", String(size));
+  history.replaceState(null, "", `?${params}`);
+}
+
 async function start(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const manifestUrl = new URL(params.get("manifest") ?? "/out/manifest.json", location.href);
-  const seed = Number(params.get("seed") ?? 1) || 0;
-  params.set("seed", String(seed));
-  history.replaceState(null, "", `?${params}`);
+  const initial = readUrl();
+  seedInput.value = String(initial.seed);
+  countInput.value = String(initial.size);
+  countLabel.value = countInput.value;
 
   const response = await fetch(manifestUrl);
   if (!response.ok) throw new Error(`Could not load ${manifestUrl} (${response.status}). Run npm run generate first.`);
@@ -180,16 +208,42 @@ async function start(): Promise<void> {
     if (!manifest.animations[name]) throw new Error(`Manifest has no ${name} animation`);
   }
 
-  const crowd = planCrowd(manifest, seed);
-  new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: element("game"),
     backgroundColor: "#2a2d33",
     pixelArt: true,
     scale: { mode: Phaser.Scale.RESIZE },
-    scene: new CrowdScene(manifest, manifestUrl, crowd),
   });
-  status.textContent = `seed ${seed} · ${crowd.length} characters`;
+  const scene = new CrowdScene(manifest, manifestUrl);
+  await new Promise((resolve) => game.events.once(Phaser.Core.Events.READY, resolve));
+
+  const spawn = (): void => {
+    const seed = Number(seedInput.value) || 0;
+    const size = crowdSize(countInput.value);
+    countLabel.value = String(size);
+    writeUrl(seed, size);
+    const data: CrowdData = { crowd: planCrowd(manifest, seed, size) };
+    if (game.scene.getScene("crowd")) scene.scene.restart(data);
+    else game.scene.add("crowd", scene, true, data);
+    status.textContent = `seed ${seed} · ${size} characters`;
+  };
+
+  reseedButton.addEventListener("click", () => {
+    seedInput.value = String(Math.floor(Math.random() * 1_000_000));
+    spawn();
+  });
+  seedInput.addEventListener("change", spawn);
+  countInput.addEventListener("input", () => {
+    countLabel.value = countInput.value;
+  });
+  countInput.addEventListener("change", spawn);
+  element<HTMLFormElement>("controls").addEventListener("submit", (event) => event.preventDefault());
+  setInterval(() => {
+    fpsLabel.textContent = `${Math.round(game.loop.actualFps)} fps`;
+  }, 500);
+
+  spawn();
 }
 
 start().catch((error: unknown) => {

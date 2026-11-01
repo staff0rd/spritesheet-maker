@@ -3,6 +3,16 @@ import type { Point } from "../core/layout";
 import type { Manifest } from "../core/manifest";
 import type { Random } from "../core/random";
 
+export const MIN_CROWD = 50;
+export const MAX_CROWD = 2000;
+export const DEFAULT_CROWD = 200;
+
+export function crowdSize(value: string | null): number {
+  const parsed = Math.round(Number(value));
+  if (value === null || value.trim() === "" || !Number.isFinite(parsed)) return DEFAULT_CROWD;
+  return Math.min(MAX_CROWD, Math.max(MIN_CROWD, parsed));
+}
+
 export function sheetColumns(manifest: Manifest): number {
   return Math.floor(manifest.sheetSize.width / manifest.frameSize.width);
 }

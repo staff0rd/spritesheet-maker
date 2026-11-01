@@ -6,7 +6,11 @@ import { buildManifest } from "../core/manifest";
 import { createRandom } from "../core/random";
 import {
   animationFrame,
+  crowdSize,
+  DEFAULT_CROWD,
   diamondPoint,
+  MAX_CROWD,
+  MIN_CROWD,
   facingFor,
   frameIndex,
   sheetColumns,
@@ -144,5 +148,19 @@ describe("stepWander", () => {
     expect(resumed.target).toEqual(wanderTarget(createRandom(1), paused, config));
     expect(resumed.direction).toBe(facingFor(resumed.target.x, resumed.target.y));
     expect(resumed).toMatchObject({ x: 0, y: 0 });
+  });
+});
+
+describe("crowdSize", () => {
+  it("defaults when missing or not a number", () => {
+    expect(crowdSize(null)).toBe(DEFAULT_CROWD);
+    expect(crowdSize("")).toBe(DEFAULT_CROWD);
+    expect(crowdSize("lots")).toBe(DEFAULT_CROWD);
+  });
+
+  it("clamps to the supported range and rounds", () => {
+    expect(crowdSize("1")).toBe(MIN_CROWD);
+    expect(crowdSize("99999")).toBe(MAX_CROWD);
+    expect(crowdSize("320.6")).toBe(321);
   });
 });
