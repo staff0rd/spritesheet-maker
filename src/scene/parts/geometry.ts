@@ -25,6 +25,32 @@ export function segmentProfile({ length, top, bottom }: Segment): Profile {
   ];
 }
 
+function quarterArc(radius: number, centreY: number, from: number, to: number, steps: number): [number, number][] {
+  return Array.from({ length: steps + 1 }, (_, step): [number, number] => {
+    const angle = from + ((to - from) * step) / steps;
+    const onAxis = Math.abs(Math.cos(angle)) < 1e-9;
+    return [onAxis ? 0 : radius * Math.cos(angle), centreY + radius * Math.sin(angle)];
+  });
+}
+
+export function capsuleProfile({ length, top, bottom }: Segment, capSteps = 4): Profile {
+  return [...quarterArc(bottom, -length, -Math.PI / 2, 0, capSteps), ...quarterArc(top, 0, 0, Math.PI / 2, capSteps)];
+}
+
+export function roundedProfile(profile: Profile, iterations = 3): Profile {
+  let points = profile;
+  for (let iteration = 0; iteration < iterations; iteration++) {
+    const cut: [number, number][] = [];
+    for (let index = 0; index < points.length - 1; index++) {
+      const [r0, y0] = points[index];
+      const [r1, y1] = points[index + 1];
+      cut.push([0.75 * r0 + 0.25 * r1, 0.75 * y0 + 0.25 * y1], [0.25 * r0 + 0.75 * r1, 0.25 * y0 + 0.75 * y1]);
+    }
+    points = [points[0], ...cut, points[points.length - 1]];
+  }
+  return points;
+}
+
 export function radiusAt(profile: Profile, y: number): number {
   const rim = profile.filter(([radius]) => radius > 0);
   if (y <= rim[0][1]) return rim[0][0];

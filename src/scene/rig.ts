@@ -1,4 +1,5 @@
 import { Group } from "three";
+import type { RenderStyle } from "../core/style";
 
 export type Profile = readonly (readonly [radius: number, y: number])[];
 
@@ -19,6 +20,11 @@ export const DEFAULT_BODY_PARAMS: BodyParams = { height: 1, build: 1, shoulders:
 
 export const TORSO_SEGMENTS = 8;
 export const LIMB_SEGMENTS = 6;
+
+export const STYLE_SEGMENTS: Record<RenderStyle, { torso: number; limb: number }> = {
+  blocky: { torso: TORSO_SEGMENTS, limb: LIMB_SEGMENTS },
+  smooth: { torso: 24, limb: 16 },
+};
 
 export interface BodyShape {
   height: number;

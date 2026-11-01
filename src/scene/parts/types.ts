@@ -1,10 +1,12 @@
 import type { Material, Object3D } from "three";
 import type { PartParams, PartSpec } from "../../core/parts";
 import type { Random } from "../../core/random";
+import type { RenderStyle } from "../../core/style";
 import type { JointName, Rig } from "../rig";
 
 export interface BuildContext {
   rig: Rig;
+  style: RenderStyle;
   random: Random;
   material: Material;
   detail: Material;

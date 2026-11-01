@@ -2,6 +2,7 @@ import { GridHelper, type Group, Mesh, PerspectiveCamera, WebGLRenderer } from "
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PART_CATALOG } from "../core/catalog";
 import type { CategoryId, PartSpec } from "../core/parts";
+import { DEFAULT_RENDER_STYLE, RENDER_STYLES, type RenderStyle } from "../core/style";
 import { createLitScene } from "./capture";
 import { applyPose, CLIPS } from "./animation";
 import { buildDressedCharacter, type TintedPart } from "./character";
@@ -102,6 +103,11 @@ export function mountViewer(container: HTMLElement): void {
   for (const clip of CLIPS) animation.add(new Option(clip.name, clip.name));
   panel.append(labelled("anim", animation));
 
+  const style = document.createElement("select");
+  for (const option of RENDER_STYLES) style.add(new Option(option, option));
+  style.value = DEFAULT_RENDER_STYLE;
+  panel.append(labelled("style", style));
+
   let character: Rig | undefined;
 
   function selected(): { body: TintedPart; parts: TintedPart[] } {
@@ -122,7 +128,7 @@ export function mountViewer(container: HTMLElement): void {
       disposeCharacter(character.root);
     }
     const { body, parts } = selected();
-    character = buildDressedCharacter(proceduralProvider, Number(seed.value) || 0, body, parts);
+    character = buildDressedCharacter(proceduralProvider, Number(seed.value) || 0, body, parts, style.value as RenderStyle);
     scene.add(character.root);
   }
 
