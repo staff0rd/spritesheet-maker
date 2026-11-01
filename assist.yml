@@ -37,3 +37,7 @@ run:
       - --host
     server: true
     port: 5173
+commit:
+  pull: true
+  expectedBranch: main
+  push: true
