@@ -30,3 +30,60 @@ export function diamondPoint(random: Random, halfWidth: number, halfHeight: numb
   const v = random();
   return { x: (u - v) * halfWidth, y: (u + v - 1) * halfHeight };
 }
+
+export function facingFor(dx: number, dy: number): Direction | undefined {
+  if (dx === 0 && dy === 0) return undefined;
+  if (dx >= 0) return dy < 0 ? "NE" : "SE";
+  return dy < 0 ? "NW" : "SW";
+}
+
+interface Floor {
+  halfWidth: number;
+  halfHeight: number;
+}
+
+export interface WanderConfig {
+  floor: Floor;
+  speed: number;
+  minPause: number;
+  maxPause: number;
+  minLeg: number;
+}
+
+export interface Wanderer {
+  x: number;
+  y: number;
+  target: Point;
+  pause: number;
+  direction: Direction;
+}
+
+export function wanderTarget(random: Random, from: Point, config: WanderConfig): Point {
+  const { floor, minLeg } = config;
+  let target = diamondPoint(random, floor.halfWidth, floor.halfHeight);
+  for (let attempt = 0; attempt < 8 && Math.hypot(target.x - from.x, target.y - from.y) < minLeg; attempt++) {
+    target = diamondPoint(random, floor.halfWidth, floor.halfHeight);
+  }
+  return target;
+}
+
+export function stepWander(wanderer: Wanderer, seconds: number, random: Random, config: WanderConfig): Wanderer {
+  if (wanderer.pause > 0) {
+    const pause = wanderer.pause - seconds;
+    if (pause > 0) return { ...wanderer, pause };
+    const target = wanderTarget(random, wanderer, config);
+    const direction = facingFor(target.x - wanderer.x, target.y - wanderer.y) ?? wanderer.direction;
+    return { ...wanderer, pause: 0, target, direction };
+  }
+
+  const dx = wanderer.target.x - wanderer.x;
+  const dy = wanderer.target.y - wanderer.y;
+  const distance = Math.hypot(dx, dy);
+  const step = config.speed * seconds;
+  const direction = facingFor(dx, dy) ?? wanderer.direction;
+  if (step >= distance) {
+    const pause = config.minPause + random() * (config.maxPause - config.minPause);
+    return { ...wanderer, x: wanderer.target.x, y: wanderer.target.y, pause, direction };
+  }
+  return { ...wanderer, x: wanderer.x + (dx / distance) * step, y: wanderer.y + (dy / distance) * step, direction };
+}

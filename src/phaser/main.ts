@@ -1,27 +1,47 @@
 import * as Phaser from "phaser";
-import { layersFor, pickCharacter, type Layer } from "../core/compose";
+import { layersFor, pickCharacter, type Character, type Layer } from "../core/compose";
 import type { Direction } from "../core/directions";
 import type { Manifest } from "../core/manifest";
-import { createRandom, hashString } from "../core/random";
-import { animationFrame, diamondPoint, frameIndex, tintColor } from "./crowd";
+import { createRandom, hashString, type Random } from "../core/random";
+import {
+  animationFrame,
+  diamondPoint,
+  frameIndex,
+  stepWander,
+  tintColor,
+  type WanderConfig,
+  type Wanderer,
+} from "./crowd";
 
 const CROWD_SIZE = 120;
-const FLOOR = { halfWidth: 480, halfHeight: 240 };
+const MAX_STEP_SECONDS = 0.1;
+const WANDER: WanderConfig = {
+  floor: { halfWidth: 480, halfHeight: 240 },
+  speed: 36,
+  minPause: 0.8,
+  maxPause: 4,
+  minLeg: 80,
+};
 
 interface Walker {
+  character: Character;
   container: Phaser.GameObjects.Container;
-  sprites: Phaser.GameObjects.Sprite[];
+  sprites: Map<string, Phaser.GameObjects.Sprite>;
+  wanderer: Wanderer;
+  random: Random;
   direction: Direction;
+  animation: string;
+  clock: number;
   phase: number;
   frame: number;
 }
 
 interface CrowdMember {
+  character: Character;
   layers: Layer[];
-  direction: Direction;
+  wanderer: Wanderer;
+  random: Random;
   phase: number;
-  x: number;
-  y: number;
 }
 
 function element<T extends HTMLElement>(id: string): T {
@@ -35,12 +55,15 @@ const status = element<HTMLSpanElement>("status");
 function planCrowd(manifest: Manifest, seed: number): CrowdMember[] {
   const random = createRandom(seed);
   const placement = createRandom(hashString(`floor:${seed}`));
-  return Array.from({ length: CROWD_SIZE }, () => {
+  const { halfWidth, halfHeight } = WANDER.floor;
+  return Array.from({ length: CROWD_SIZE }, (_, index) => {
     const character = pickCharacter(manifest, random);
     const direction = manifest.directions[Math.floor(random() * manifest.directions.length)];
     const phase = random();
-    const { x, y } = diamondPoint(placement, FLOOR.halfWidth, FLOOR.halfHeight);
-    return { layers: layersFor(manifest, character, direction), direction, phase, x, y };
+    const { x, y } = diamondPoint(placement, halfWidth, halfHeight);
+    const wander = createRandom(hashString(`wander:${seed}:${index}`));
+    const wanderer: Wanderer = { x, y, target: { x, y }, pause: wander() * WANDER.maxPause, direction };
+    return { character, layers: layersFor(manifest, character, direction), wanderer, random: wander, phase };
   });
 }
 
@@ -67,7 +90,7 @@ class CrowdScene extends Phaser.Scene {
     const { manifest } = this;
     const { anchor, frameSize } = manifest;
     const floor = this.add.graphics().setDepth(-Infinity);
-    const { halfWidth, halfHeight } = FLOOR;
+    const { halfWidth, halfHeight } = WANDER.floor;
     floor.fillStyle(0x5b6b4f);
     floor.fillPoints([
       new Phaser.Math.Vector2(0, -halfHeight),
@@ -76,15 +99,29 @@ class CrowdScene extends Phaser.Scene {
       new Phaser.Math.Vector2(-halfWidth, 0),
     ]);
 
-    this.walkers = this.crowd.map(({ layers, direction, phase, x, y }) => {
-      const sprites = layers.map((layer) =>
-        this.add
-          .sprite(0, 0, layer.file)
-          .setOrigin(anchor.x / frameSize.width, anchor.y / frameSize.height)
-          .setTint(tintColor(layer.tint)),
+    this.walkers = this.crowd.map(({ character, layers, wanderer, random, phase }) => {
+      const sprites = new Map(
+        layers.map((layer) => [
+          layer.category,
+          this.add
+            .sprite(0, 0, layer.file)
+            .setOrigin(anchor.x / frameSize.width, anchor.y / frameSize.height)
+            .setTint(tintColor(layer.tint)),
+        ]),
       );
-      const container = this.add.container(x, y, sprites).setDepth(y);
-      return { container, sprites, direction, phase, frame: -1 };
+      const container = this.add.container(wanderer.x, wanderer.y, [...sprites.values()]).setDepth(wanderer.y);
+      return {
+        character,
+        container,
+        sprites,
+        wanderer,
+        random,
+        direction: wanderer.direction,
+        animation: "",
+        clock: 0,
+        phase,
+        frame: -1,
+      };
     });
 
     const centre = () => this.cameras.main.centerOn(0, 0);
@@ -92,20 +129,40 @@ class CrowdScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, centre);
   }
 
-  update(time: number): void {
-    const walk = this.manifest.animations.walk;
-    if (!walk) return;
-    const seconds = time / 1000;
-    for (const walker of this.walkers) {
-      const frame = frameIndex(
-        this.manifest,
-        walker.direction,
-        animationFrame(walk.frames, walk.fps, seconds, walker.phase),
-      );
-      if (frame === walker.frame) continue;
-      walker.frame = frame;
-      for (const sprite of walker.sprites) sprite.setFrame(frame);
+  update(_time: number, delta: number): void {
+    const seconds = Math.min(delta / 1000, MAX_STEP_SECONDS);
+    for (const walker of this.walkers) this.advance(walker, seconds);
+  }
+
+  private advance(walker: Walker, seconds: number): void {
+    const wanderer = stepWander(walker.wanderer, seconds, walker.random, WANDER);
+    walker.wanderer = wanderer;
+    walker.container.setPosition(wanderer.x, wanderer.y).setDepth(wanderer.y);
+
+    const name = wanderer.pause > 0 ? "idle" : "walk";
+    if (name !== walker.animation) {
+      walker.animation = name;
+      walker.clock = 0;
     }
+    walker.clock += seconds;
+
+    if (wanderer.direction !== walker.direction) {
+      walker.direction = wanderer.direction;
+      for (const layer of layersFor(this.manifest, walker.character, walker.direction)) {
+        const sprite = walker.sprites.get(layer.category);
+        if (sprite) walker.container.bringToTop(sprite);
+      }
+    }
+
+    const animation = this.manifest.animations[name];
+    const frame = frameIndex(
+      this.manifest,
+      walker.direction,
+      animationFrame(animation.frames, animation.fps, walker.clock, walker.phase),
+    );
+    if (frame === walker.frame) return;
+    walker.frame = frame;
+    for (const sprite of walker.sprites.values()) sprite.setFrame(frame);
   }
 }
 
@@ -119,7 +176,9 @@ async function start(): Promise<void> {
   const response = await fetch(manifestUrl);
   if (!response.ok) throw new Error(`Could not load ${manifestUrl} (${response.status}). Run npm run generate first.`);
   const manifest = (await response.json()) as Manifest;
-  if (!manifest.animations.walk) throw new Error("Manifest has no walk animation");
+  for (const name of ["walk", "idle"]) {
+    if (!manifest.animations[name]) throw new Error(`Manifest has no ${name} animation`);
+  }
 
   const crowd = planCrowd(manifest, seed);
   new Phaser.Game({
