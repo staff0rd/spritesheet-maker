@@ -1,10 +1,14 @@
 import { BoxGeometry, IcosahedronGeometry } from "three";
 import { ARMS, LEGS, LIMB_SEGMENTS, TORSO_SEGMENTS } from "../rig";
 import { enclosingShell, latheMesh, mesh, radiusAt, segmentShell } from "./geometry";
+import { makeFittedSkirt } from "./skirtFit";
 import { definePart, type BuildContext } from "./types";
 
 const CLOTH_MARGIN = 0.018;
 const SKIRT_DEPTH = 0.75;
+const SKIRT_ROWS = 12;
+const SKIRT_SECTOR = (2 * Math.PI) / TORSO_SEGMENTS;
+const SKIRT_EDGE_SLOPE = (1 - Math.cos(SKIRT_SECTOR)) / (Math.sin(SKIRT_SECTOR) * SKIRT_DEPTH);
 
 type ShirtParams = {
   sleeve: string;
@@ -83,10 +87,15 @@ type SkirtParams = {
 
 function buildSkirt({ rig: { shape }, material, detail, add }: BuildContext, params: SkirtParams): void {
   const hemY = shape.hip.y - params.length * (shape.thigh.length + shape.shin.length);
-  const hipRadius = radiusAt(shape.torso, 0.95) + CLOTH_MARGIN;
+  const hipRadius = Math.max(radiusAt(shape.torso, 0.95), shape.hip.x + shape.thigh.top * Math.hypot(1, SKIRT_EDGE_SLOPE)) + CLOTH_MARGIN;
+  const hemRadius = 0.2 * shape.build + params.flare;
+  const panel = Array.from({ length: SKIRT_ROWS }, (_, row): [number, number] => {
+    const t = row / SKIRT_ROWS;
+    return [hemRadius + (hipRadius - hemRadius) * t, hemY + (0.95 - hemY) * t];
+  });
   const skirt = latheMesh(
     [
-      [0.2 * shape.build + params.flare, hemY],
+      ...panel,
       [hipRadius, 0.95],
       [radiusAt(shape.torso, shape.waistY) + CLOTH_MARGIN, shape.waistY],
       [0, shape.waistY + CLOTH_MARGIN],
@@ -96,6 +105,7 @@ function buildSkirt({ rig: { shape }, material, detail, add }: BuildContext, par
     "skirt",
     SKIRT_DEPTH,
   );
+  makeFittedSkirt(skirt);
   add("torso", skirt);
   add("torso", latheMesh(enclosingShell(shape.torso, shape.waistY - 0.04, shape.waistY, CLOTH_MARGIN * 2.4), TORSO_SEGMENTS, detail, "waistband", SKIRT_DEPTH));
 }

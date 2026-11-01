@@ -1,3 +1,4 @@
+import { fitSkirts } from "./parts/skirtFit";
 import { ARMS, LEGS, type JointName, type Rig } from "./rig";
 
 export type Pose = Partial<Record<JointName | "lift", number>>;
@@ -89,4 +90,5 @@ export function applyPose(rig: Rig, pose: Pose): void {
   rig.joints.armRight.position.y += rig.shape.shoulder.y;
   const reach = Math.max(...LEGS.map((leg) => legReach(rig, leg.upper, leg.lower)));
   rig.root.position.y = (reach - rig.shape.hip.y) * rig.shape.height;
+  fitSkirts(rig);
 }
