@@ -28,6 +28,11 @@ run:
     args:
       - test
     quiet: true
+  - name: generate
+    command: npm
+    args:
+      - run
+      - generate
   - name: dev
     command: npm
     args:

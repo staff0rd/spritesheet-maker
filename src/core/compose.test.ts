@@ -95,6 +95,23 @@ describe("layersFor", () => {
     ]);
   });
 
+  it("uses the normal hair sheet when the character has no hat", () => {
+    expect(layersFor(manifest, character, "SE").find((layer) => layer.category === "hair")?.file).toBe("hair/long.broad.png");
+  });
+
+  it("uses the hatted hair sheet when the character has a hat", () => {
+    const hatted: Character = { parts: { ...character.parts, hat: { variant: "tophat", tint: "#2b2b2b" } } };
+
+    expect(layersFor(manifest, hatted, "NW")).toEqual([
+      { category: "body", file: "body/broad.png", tint: "#8d5524" },
+      { category: "shoes", file: "shoes/boots.broad.png", tint: "#8b5a2b" },
+      { category: "bottom", file: "bottom/skirt.broad.png", tint: "#2b2b2b" },
+      { category: "top", file: "top/hoodie.broad.png", tint: "#2e86c1" },
+      { category: "hair", file: "hair/long.broad.hatted.png", tint: "#1b1612" },
+      { category: "hat", file: "hat/tophat.broad.png", tint: "#2b2b2b" },
+    ]);
+  });
+
   it("rejects variants missing from the manifest", () => {
     const unknown: Character = { parts: { ...character.parts, hat: { variant: "crown", tint: "#f1c40f" } } };
 

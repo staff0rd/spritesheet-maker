@@ -14,7 +14,9 @@ import { latheMesh, mesh } from "./geometry";
 import { definePart, type BuildContext } from "./types";
 
 const HAIR_RADIUS = 0.135;
+const HATTED_HAIR_RADIUS = 0.13;
 const HAT_RADIUS = 0.1425;
+const HATTED_SIDES_FROM = 0.5;
 const FACE_GAP = 0.75 * Math.PI;
 
 interface DomeOptions {
@@ -54,33 +56,41 @@ function sideBand(shape: BodyShape, material: Material, from: number, to: number
 
 type CropParams = { coverage: number; tilt: number; radius: number };
 
-function buildCrop({ rig: { shape }, material, add }: BuildContext, params: CropParams): void {
-  add("head", dome(shape, material, { ...params, name: "hair" }));
+function hairRadius(hatted: boolean): number {
+  return hatted ? HATTED_HAIR_RADIUS : HAIR_RADIUS;
+}
+
+function buildCrop({ rig: { shape }, material, hatted, add }: BuildContext, params: CropParams): void {
+  const radius = hatted ? Math.min(params.radius, HATTED_HAIR_RADIUS) : params.radius;
+  add("head", dome(shape, material, { ...params, radius, name: "hair" }));
 }
 
 type BobParams = { length: number };
 
-function buildBob({ rig: { shape }, material, add }: BuildContext, params: BobParams): void {
-  add("head", dome(shape, material, { radius: HAIR_RADIUS, coverage: 0.52, tilt: 0.25, name: "hair" }));
-  add("head", sideBand(shape, material, 0.25, 0.25 + params.length, HAIR_RADIUS * 1.03));
+function buildBob({ rig: { shape }, material, hatted, add }: BuildContext, params: BobParams): void {
+  const radius = hairRadius(hatted);
+  const from = hatted ? HATTED_SIDES_FROM : 0.25;
+  add("head", dome(shape, material, { radius, coverage: 0.52, tilt: 0.25, name: "hair" }));
+  add("head", sideBand(shape, material, from, 0.25 + params.length, radius * 1.03));
 }
 
 type LongParams = { length: number };
 
 function buildLong(context: BuildContext, params: LongParams): void {
-  const { rig: { shape }, material, add } = context;
+  const { rig: { shape }, material, hatted, add } = context;
   buildBob(context, { length: 0.62 });
   const top = shape.skull.y - 0.02;
   const back = mesh(new BoxGeometry(0.22, params.length, 0.05), material, "hairBack");
-  back.position.set(0, top - params.length / 2, -HAIR_RADIUS - 0.006);
+  back.position.set(0, top - params.length / 2, -hairRadius(hatted) - 0.006);
   back.rotation.x = -0.12;
   add("head", back);
 }
 
 type SpikyParams = { spikes: number; spikeLength: number };
 
-function buildSpiky({ rig: { shape }, material, random, add }: BuildContext, params: SpikyParams): void {
-  add("head", dome(shape, material, { radius: HAIR_RADIUS, coverage: 0.5, tilt: 0.3, name: "hair" }));
+function buildSpiky({ rig: { shape }, material, random, hatted, add }: BuildContext, params: SpikyParams): void {
+  add("head", dome(shape, material, { radius: hairRadius(hatted), coverage: 0.5, tilt: 0.3, name: "hair" }));
+  if (hatted) return;
   const [sx, sy, sz] = shape.skull.scale;
   const up = new Vector3(0, 1, 0);
   for (let index = 0; index < params.spikes; index++) {
@@ -99,8 +109,9 @@ function buildSpiky({ rig: { shape }, material, random, add }: BuildContext, par
 
 type BunParams = { size: number };
 
-function buildBun({ rig: { shape }, material, add }: BuildContext, params: BunParams): void {
-  add("head", dome(shape, material, { radius: HAIR_RADIUS, coverage: 0.55, tilt: 0.35, name: "hair" }));
+function buildBun({ rig: { shape }, material, hatted, add }: BuildContext, params: BunParams): void {
+  add("head", dome(shape, material, { radius: hairRadius(hatted), coverage: 0.55, tilt: 0.35, name: "hair" }));
+  if (hatted) return;
   const bun = mesh(new IcosahedronGeometry(params.size, 1), material, "bun");
   bun.position.set(0, shape.skull.y + 0.09, -0.108);
   add("head", bun);
@@ -108,7 +119,11 @@ function buildBun({ rig: { shape }, material, add }: BuildContext, params: BunPa
 
 type AfroParams = { size: number };
 
-function buildAfro({ rig: { shape }, material, add }: BuildContext, params: AfroParams): void {
+function buildAfro({ rig: { shape }, material, hatted, add }: BuildContext, params: AfroParams): void {
+  if (hatted) {
+    add("head", dome(shape, material, { radius: HATTED_HAIR_RADIUS, coverage: 0.56, tilt: 0.35, name: "hair" }));
+    return;
+  }
   const afro = mesh(new IcosahedronGeometry(params.size, 1), material, "afro");
   afro.position.set(0, shape.skull.y + 0.07, -0.05);
   add("head", afro);

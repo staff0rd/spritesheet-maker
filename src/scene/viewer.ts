@@ -113,7 +113,14 @@ export function mountViewer(container: HTMLElement): void {
       return [{ spec, tint: Number.parseInt(control.tint.value.slice(1), 16) }];
     });
     const body = picks.find((pick) => pick.spec.category === PART_CATALOG.baseCategory)!;
-    return { body, parts: picks.filter((pick) => pick !== body) };
+    const hatted = picks.some((pick) => pick.spec.category === "hat");
+    const parts = picks
+      .filter((pick) => pick !== body)
+      .map((pick) => {
+        const category = PART_CATALOG.categories.find((option) => option.id === pick.spec.category);
+        return hatted && category?.hatted ? { ...pick, spec: { ...pick.spec, hatted } } : pick;
+      });
+    return { body, parts };
   }
 
   function rebuild(): void {

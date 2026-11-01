@@ -28,6 +28,7 @@ function addLayer(provider: PartProvider, rig: Rig, spec: PartSpec, seed: number
     random: partRandom(seed, spec),
     material,
     detail: detail ?? material,
+    hatted: spec.hatted ?? false,
     add(joint, object) {
       object.traverse((child) => {
         child.renderOrder = mode.depthOnly ? -1 : 0;

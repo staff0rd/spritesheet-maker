@@ -8,6 +8,7 @@ export interface BuildContext {
   random: Random;
   material: Material;
   detail: Material;
+  hatted: boolean;
   add(joint: JointName, object: Object3D): void;
 }
 

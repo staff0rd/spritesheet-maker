@@ -6,6 +6,7 @@ import { sheetFile, type CategoryId, type PartCatalog, type TintGroup } from "./
 interface ManifestVariant {
   id: string;
   files: Record<string, string>;
+  hattedFiles?: Record<string, string>;
 }
 
 interface ManifestCategory {
@@ -72,15 +73,16 @@ export function buildManifest({ config, layout, animations, catalog }: ManifestI
         {
           tintGroup: category.tintGroup,
           optional: category.optional,
-          variants: category.variants.map((variant) => ({
-            id: variant.id,
-            files: Object.fromEntries(
-              (category.id === catalog.baseCategory ? [variant.id] : bodyIds).map((bodyId) => [
-                bodyId,
-                sheetFile(catalog, category.id, variant.id, bodyId),
-              ]),
-            ),
-          })),
+          variants: category.variants.map((variant) => {
+            const filesFor = (hatted: boolean) =>
+              Object.fromEntries(
+                (category.id === catalog.baseCategory ? [variant.id] : bodyIds).map((bodyId) => [
+                  bodyId,
+                  sheetFile(catalog, category.id, variant.id, bodyId, hatted),
+                ]),
+              );
+            return { id: variant.id, files: filesFor(false), ...(category.hatted && { hattedFiles: filesFor(true) }) };
+          }),
         },
       ]),
     ),

@@ -58,7 +58,8 @@ describe("planSheets", () => {
 
   it("renders each body once and every other variant once per body", () => {
     const expected = PART_CATALOG.categories.reduce(
-      (total, category) => total + category.variants.length * (category.id === "body" ? 1 : bodies.length),
+      (total, category) =>
+        total + category.variants.length * (category.id === "body" ? 1 : bodies.length * (category.hatted ? 2 : 1)),
       0,
     );
     expect(jobs).toHaveLength(expected);
@@ -77,6 +78,15 @@ describe("planSheets", () => {
   it("names files by category, variant and body", () => {
     expect(jobs.map((job) => job.file)).toContain("body/slim.png");
     expect(jobs.map((job) => job.file)).toContain("hat/tophat.broad.png");
+  });
+
+  it("renders a hatted sheet per body for every hair variant", () => {
+    const hatted = jobs.filter((job) => job.part?.hatted);
+    const hair = PART_CATALOG.categories.find((category) => category.id === "hair")!;
+
+    expect(hatted.map((job) => job.file).sort()).toEqual(
+      hair.variants.flatMap((variant) => bodies.map((body) => `hair/${variant.id}.${body}.hatted.png`)).sort(),
+    );
   });
 });
 

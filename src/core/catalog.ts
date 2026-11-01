@@ -20,6 +20,7 @@ export const PART_CATALOG: PartCatalog = {
       id: "hair",
       tintGroup: "hair",
       optional: true,
+      hatted: true,
       variants: [
         { id: "buzz", kind: "crop", params: { coverage: 0.5, tilt: 0.3, radius: 0.131 } },
         { id: "short", kind: "crop", params: {} },

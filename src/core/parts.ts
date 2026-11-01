@@ -10,13 +10,15 @@ export interface PartSpec {
   id: string;
   kind: string;
   params: PartParams;
+  hatted?: boolean;
 }
 
 interface CategoryConfig {
   id: CategoryId;
   tintGroup: TintGroup;
   optional: boolean;
-  variants: readonly Omit<PartSpec, "category">[];
+  hatted?: boolean;
+  variants: readonly Omit<PartSpec, "category" | "hatted">[];
 }
 
 export interface PartCatalog {
@@ -65,8 +67,9 @@ export function validateCatalog(catalog: PartCatalog, directions: readonly Direc
   }
 }
 
-export function sheetFile(catalog: PartCatalog, category: CategoryId, variant: string, bodyVariant: string): string {
-  return category === catalog.baseCategory ? `${category}/${variant}.png` : `${category}/${variant}.${bodyVariant}.png`;
+export function sheetFile(catalog: PartCatalog, category: CategoryId, variant: string, bodyVariant: string, hatted = false): string {
+  if (category === catalog.baseCategory) return `${category}/${variant}.png`;
+  return `${category}/${variant}.${bodyVariant}${hatted ? ".hatted" : ""}.png`;
 }
 
 export function planSheets(catalog: PartCatalog): SheetJob[] {
@@ -84,14 +87,16 @@ export function planSheets(catalog: PartCatalog): SheetJob[] {
           body,
         }))
       : specsOf(category).flatMap((part) =>
-          bodies.map((body) => ({
-            file: sheetFile(catalog, part.category, part.id, body.id),
-            category: part.category,
-            variant: part.id,
-            bodyVariant: body.id,
-            body,
-            part,
-          })),
+          (category.hatted ? [false, true] : [false]).flatMap((hatted) =>
+            bodies.map((body) => ({
+              file: sheetFile(catalog, part.category, part.id, body.id, hatted),
+              category: part.category,
+              variant: part.id,
+              bodyVariant: body.id,
+              body,
+              part: hatted ? { ...part, hatted } : part,
+            })),
+          ),
         ),
   );
 }

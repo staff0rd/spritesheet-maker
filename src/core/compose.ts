@@ -77,7 +77,8 @@ export function layersFor(manifest: Manifest, character: Character, direction: D
     if (!part) return [];
     const variant = manifest.categories[categoryId]?.variants.find((option) => option.id === part.variant);
     if (!variant) throw new Error(`Unknown ${categoryId} variant "${part.variant}"`);
-    const file = variant.files[categoryId === manifest.baseCategory ? part.variant : body.variant];
+    const files = (character.parts.hat && variant.hattedFiles) || variant.files;
+    const file = files[categoryId === manifest.baseCategory ? part.variant : body.variant];
     if (!file) throw new Error(`No ${categoryId}/${part.variant} sheet for body "${body.variant}"`);
     return [{ category: categoryId, file, tint: part.tint }];
   });

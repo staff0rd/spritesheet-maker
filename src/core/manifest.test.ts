@@ -76,6 +76,36 @@ describe("buildManifest", () => {
     });
   });
 
+  it("lists hatted files only for categories that render hatted sheets", () => {
+    const hattedCatalog: PartCatalog = {
+      ...catalog,
+      categories: [catalog.categories[0], { ...catalog.categories[1], hatted: true }],
+    };
+    const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0], fps: 3 } }, catalog: hattedCatalog });
+
+    expect(manifest.categories.top!.variants).toEqual([
+      {
+        id: "tshirt",
+        files: { slim: "top/tshirt.slim.png", broad: "top/tshirt.broad.png" },
+        hattedFiles: { slim: "top/tshirt.slim.hatted.png", broad: "top/tshirt.broad.hatted.png" },
+      },
+    ]);
+    expect(manifest.categories.body!.variants.every((variant) => variant.hattedFiles === undefined)).toBe(true);
+  });
+
+  it("lists a hatted sheet per body for every hair variant in the default catalog", () => {
+    const manifest = buildManifest({ config: DEFAULT_CAPTURE_CONFIG, layout, animations: { idle: { frames: [0], fps: 3 } }, catalog: PART_CATALOG });
+
+    for (const variant of manifest.categories.hair!.variants) {
+      expect(variant.hattedFiles, variant.id).toEqual({
+        slim: `hair/${variant.id}.slim.hatted.png`,
+        average: `hair/${variant.id}.average.hatted.png`,
+        broad: `hair/${variant.id}.broad.hatted.png`,
+      });
+    }
+    expect(manifest.categories.hat!.variants.every((variant) => variant.hattedFiles === undefined)).toBe(true);
+  });
+
   it("is identical for the same seed and catalog", () => {
     const build = () =>
       JSON.stringify(

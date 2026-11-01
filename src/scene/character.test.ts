@@ -72,6 +72,17 @@ describe("buildCharacter", () => {
     }
   });
 
+  it.each(["afro", "bun", "spiky"])("drops the volume of %s hair when hatted", (id) => {
+    const hair = { ...PART_CATALOG.categories.find((category) => category.id === "hair")!.variants.find((variant) => variant.id === id)!, category: "hair" as const };
+    const names = (hatted: boolean) =>
+      meshes(buildCharacter(proceduralProvider, { seed: 1, body, part: { ...hair, hatted } }).root)
+        .filter((mesh) => mesh.userData.layer === "hair")
+        .map((mesh) => mesh.name);
+
+    expect(names(false).some((name) => name !== "hair")).toBe(true);
+    expect(names(true)).toEqual(["hair"]);
+  });
+
   it("varies seeded parts with the seed", () => {
     const build = (seed: number) => snapshot(buildCharacter(proceduralProvider, { seed, body, part: spiky }).root);
     expect(build(1)).not.toEqual(build(2));
