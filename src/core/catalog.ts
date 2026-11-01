@@ -21,7 +21,7 @@ export const PART_CATALOG: PartCatalog = {
       tintGroup: "hair",
       optional: true,
       variants: [
-        { id: "buzz", kind: "crop", params: { coverage: 0.5, tilt: 0.3, radius: 0.142 } },
+        { id: "buzz", kind: "crop", params: { coverage: 0.5, tilt: 0.3, radius: 0.131 } },
         { id: "short", kind: "crop", params: {} },
         { id: "bob", kind: "bob", params: {} },
         { id: "long", kind: "long", params: {} },
@@ -71,7 +71,7 @@ export const PART_CATALOG: PartCatalog = {
         { id: "cap", kind: "baseball-cap", params: {} },
         { id: "beanie", kind: "beanie", params: {} },
         { id: "sunhat", kind: "brimmed", params: {} },
-        { id: "tophat", kind: "brimmed", params: { crownHeight: 0.24, crownRadius: 0.155, brimRadius: 0.21, band: true } },
+        { id: "tophat", kind: "brimmed", params: { crownHeight: 0.24, crownRadius: 0.1375, brimRadius: 0.21, band: true } },
       ],
     },
   ],

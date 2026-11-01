@@ -13,8 +13,8 @@ import type { BodyShape } from "../rig";
 import { latheMesh, mesh } from "./geometry";
 import { definePart, type BuildContext } from "./types";
 
-const HAIR_RADIUS = 0.15;
-const HAT_RADIUS = 0.165;
+const HAIR_RADIUS = 0.135;
+const HAT_RADIUS = 0.1425;
 const FACE_GAP = 0.75 * Math.PI;
 
 interface DomeOptions {
@@ -72,7 +72,7 @@ function buildLong(context: BuildContext, params: LongParams): void {
   buildBob(context, { length: 0.62 });
   const top = shape.skull.y - 0.02;
   const back = mesh(new BoxGeometry(0.22, params.length, 0.05), material, "hairBack");
-  back.position.set(0, top - params.length / 2, -HAIR_RADIUS - 0.012);
+  back.position.set(0, top - params.length / 2, -HAIR_RADIUS - 0.006);
   back.rotation.x = -0.12;
   add("head", back);
 }
@@ -92,7 +92,7 @@ function buildSpiky({ rig: { shape }, material, random, add }: BuildContext, par
     geometry.translate(0, length / 2, 0);
     const spike = mesh(geometry, material, "spike");
     spike.quaternion.copy(new Quaternion().setFromUnitVectors(up, direction));
-    spike.position.set(direction.x * 0.13 * sx, shape.skull.y + direction.y * 0.13 * sy, direction.z * 0.13 * sz);
+    spike.position.set(direction.x * 0.125 * sx, shape.skull.y + direction.y * 0.125 * sy, direction.z * 0.125 * sz);
     add("head", spike);
   }
 }
@@ -102,7 +102,7 @@ type BunParams = { size: number };
 function buildBun({ rig: { shape }, material, add }: BuildContext, params: BunParams): void {
   add("head", dome(shape, material, { radius: HAIR_RADIUS, coverage: 0.55, tilt: 0.35, name: "hair" }));
   const bun = mesh(new IcosahedronGeometry(params.size, 1), material, "bun");
-  bun.position.set(0, shape.skull.y + 0.1, -0.12);
+  bun.position.set(0, shape.skull.y + 0.09, -0.108);
   add("head", bun);
 }
 
@@ -133,7 +133,7 @@ function buildBeanie({ rig: { shape }, material, detail, add }: BuildContext): v
 type BrimmedParams = { crownHeight: number; crownRadius: number; brimRadius: number; band: boolean };
 
 function buildBrimmed({ rig: { shape }, material, detail, add }: BuildContext, params: BrimmedParams): void {
-  const base = shape.skull.y + 0.06;
+  const base = shape.skull.y + 0.03;
   const { crownRadius, crownHeight } = params;
   add(
     "head",
@@ -173,13 +173,13 @@ export const HEADWEAR_PARTS = [
   definePart({ category: "hair", kind: "long", defaults: { length: 0.34 }, build: buildLong }),
   definePart({ category: "hair", kind: "spiky", defaults: { spikes: 11, spikeLength: 0.09 }, build: buildSpiky }),
   definePart({ category: "hair", kind: "bun", defaults: { size: 0.065 }, build: buildBun }),
-  definePart({ category: "hair", kind: "afro", defaults: { size: 0.17 }, build: buildAfro }),
+  definePart({ category: "hair", kind: "afro", defaults: { size: 0.155 }, build: buildAfro }),
   definePart({ category: "hat", kind: "baseball-cap", defaults: {}, build: buildBaseballCap }),
   definePart({ category: "hat", kind: "beanie", defaults: {}, build: buildBeanie }),
   definePart({
     category: "hat",
     kind: "brimmed",
-    defaults: { crownHeight: 0.13, crownRadius: 0.155, brimRadius: 0.3, band: true },
+    defaults: { crownHeight: 0.13, crownRadius: 0.1375, brimRadius: 0.3, band: true },
     build: buildBrimmed,
   }),
 ];
