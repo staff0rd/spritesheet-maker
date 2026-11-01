@@ -19,6 +19,7 @@ const directionSelect = element<HTMLSelectElement>("direction");
 const scaleSelect = element<HTMLSelectElement>("scale");
 const animationSelect = element<HTMLSelectElement>("animation");
 const status = element<HTMLSpanElement>("status");
+const fpsLabel = element<HTMLSpanElement>("fps");
 const canvas = element<HTMLCanvasElement>("crowd");
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -116,10 +117,23 @@ async function render(manifest: Manifest, loadSheet: (file: string) => Promise<H
   const animation = manifest.animations[animationSelect.value] ?? Object.values(manifest.animations)[0];
   if (!animation) throw new Error("Manifest has no animations");
   let lastTick = -1;
+  let windowStart = performance.now();
+  let loops = 0;
+  let draws = 0;
+  let drawTime = 0;
   const draw = (time: number) => {
+    loops++;
+    if (time - windowStart >= 500) {
+      const seconds = (time - windowStart) / 1000;
+      const drawMs = draws ? (drawTime / draws).toFixed(2) : "–";
+      fpsLabel.textContent = `${Math.round(loops / seconds)} fps · ${(draws / seconds).toFixed(1)} frame changes/s @ ${animation.fps} fps · ${drawMs} ms/draw`;
+      windowStart = time;
+      loops = draws = drawTime = 0;
+    }
     const tick = Math.floor((time / 1000) * animation.fps);
     if (tick !== lastTick) {
       lastTick = tick;
+      const drawStart = performance.now();
       context.clearRect(0, 0, canvas.width, canvas.height);
       walkers.forEach(({ strip, phase }, index) => {
         const frames = animation.frames;
@@ -128,6 +142,8 @@ async function render(manifest: Manifest, loadSheet: (file: string) => Promise<H
         const y = Math.floor(index / COLUMNS) * cellHeight;
         context.drawImage(strip, frame * width, 0, width, height, x, y, width, height);
       });
+      draws++;
+      drawTime += performance.now() - drawStart;
     }
     animationHandle = requestAnimationFrame(draw);
   };
