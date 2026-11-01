@@ -68,7 +68,7 @@ export function bodyShape({ height, build, shoulders, hips }: BodyParams): BodyS
       width: 0.1 * build,
       height: footHeight,
       depth: 0.22,
-      y: -(hipY - thigh.length) + footHeight / 2,
+      y: footHeight / 2,
       z: 0.05,
     },
     shoulder: { x: 0.23 * shoulderWidth, y: 1.44, splay: 0.08 },
@@ -89,8 +89,10 @@ export type JointName =
   | "elbowRight"
   | "legLeft"
   | "kneeLeft"
+  | "ankleLeft"
   | "legRight"
-  | "kneeRight";
+  | "kneeRight"
+  | "ankleRight";
 
 export const ARMS = [
   { upper: "armLeft", lower: "elbowLeft" },
@@ -98,8 +100,8 @@ export const ARMS = [
 ] as const;
 
 export const LEGS = [
-  { upper: "legLeft", lower: "kneeLeft" },
-  { upper: "legRight", lower: "kneeRight" },
+  { upper: "legLeft", lower: "kneeLeft", foot: "ankleLeft" },
+  { upper: "legRight", lower: "kneeRight", foot: "ankleRight" },
 ] as const;
 
 export interface Rig {
@@ -145,10 +147,27 @@ export function createRig(shape: BodyShape): Rig {
   const kneeRight = joint("kneeRight", legRight);
   kneeLeft.position.y = -shape.thigh.length;
   kneeRight.position.y = -shape.thigh.length;
+  const ankleLeft = joint("ankleLeft", kneeLeft);
+  const ankleRight = joint("ankleRight", kneeRight);
+  ankleLeft.position.y = -(shape.hip.y - shape.thigh.length);
+  ankleRight.position.y = -(shape.hip.y - shape.thigh.length);
 
   return {
     root,
     shape,
-    joints: { torso, head, armLeft, elbowLeft, armRight, elbowRight, legLeft, kneeLeft, legRight, kneeRight },
+    joints: {
+      torso,
+      head,
+      armLeft,
+      elbowLeft,
+      armRight,
+      elbowRight,
+      legLeft,
+      kneeLeft,
+      ankleLeft,
+      legRight,
+      kneeRight,
+      ankleRight,
+    },
   };
 }

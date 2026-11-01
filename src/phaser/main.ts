@@ -17,7 +17,7 @@ import {
 const MAX_STEP_SECONDS = 0.1;
 const WANDER: WanderConfig = {
   floor: { halfWidth: 480, halfHeight: 240 },
-  speed: 36,
+  speed: 44,
   minPause: 0.8,
   maxPause: 4,
   minLeg: 80,

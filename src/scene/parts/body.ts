@@ -30,7 +30,7 @@ function buildHumanoid({ rig: { shape }, material, add }: BuildContext): void {
     add(leg.lower, latheMesh(segmentProfile(shape.shin), LIMB_SEGMENTS, material, "shin"));
     const foot = mesh(new BoxGeometry(shape.foot.width, shape.foot.height, shape.foot.depth), material, "foot");
     foot.position.set(0, shape.foot.y, shape.foot.z);
-    add(leg.lower, foot);
+    add(leg.foot, foot);
   }
 }
 

@@ -5,7 +5,7 @@ import { planSheets } from "../core/parts";
 import { applyPose, CLIPS, sheetFrames } from "./animation";
 import { buildCharacter } from "./character";
 import { proceduralProvider } from "./parts/procedural";
-import type { Rig } from "./rig";
+import { LEGS, type Rig } from "./rig";
 
 const bodies = planSheets(PART_CATALOG).filter((job) => !job.part);
 
@@ -37,6 +37,43 @@ describe("sheetFrames", () => {
     expect(walk.poses.length).toBeGreaterThanOrEqual(4);
     expect(walk.poses.length).toBeLessThanOrEqual(6);
     expect(new Set(walk.poses.map((pose) => pose.legLeft)).size).toBeGreaterThan(2);
+  });
+});
+
+describe("applyPose walk", () => {
+  const rig = buildCharacter(proceduralProvider, { seed: 1, body: bodies[0].body });
+  const walk = CLIPS.find((clip) => clip.name === "walk")!;
+  const frames = walk.poses.map((pose) => {
+    applyPose(rig, pose);
+    rig.root.updateMatrixWorld(true);
+    return LEGS.map((leg) => {
+      const box = new Box3().setFromObject(rig.joints[leg.foot]);
+      return {
+        z: (box.min.z + box.max.z) / 2,
+        grounded: box.min.y < 0.01,
+        thigh: pose[leg.upper]!,
+        knee: pose[leg.lower]!,
+      };
+    });
+  });
+  const transitions = frames.flatMap((pair, frame) =>
+    pair.map((leg, side) => ({ from: leg, to: frames[(frame + 1) % frames.length][side] })),
+  );
+
+  it("holds each planted foot still as the body moves at a steady pace", () => {
+    const travel = frames[0][0].z - frames[1][0].z;
+    expect(travel).toBeGreaterThan(0.1);
+    for (const { from, to } of transitions.filter(({ from, to }) => from.grounded && to.grounded)) {
+      expect(from.z - to.z).toBeCloseTo(travel, 1);
+    }
+  });
+
+  it("only straightens an airborne leg's knee while its thigh carries forward", () => {
+    const airborne = transitions.filter(({ from }) => !from.grounded);
+    expect(airborne.length).toBeGreaterThan(0);
+    for (const { from, to } of airborne) {
+      if (from.knee - to.knee > 0.1) expect(from.thigh - to.thigh).toBeGreaterThan(0.1);
+    }
   });
 });
 

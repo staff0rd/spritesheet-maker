@@ -119,12 +119,12 @@ function buildShoes({ rig: { shape }, material, detail, add }: BuildContext, par
   for (const leg of LEGS) {
     const upper = mesh(new BoxGeometry(foot.width + 2 * CLOTH_MARGIN, foot.height + 2 * CLOTH_MARGIN, foot.depth + 2 * CLOTH_MARGIN), material, "shoe");
     upper.position.set(0, foot.y, foot.z);
-    add(leg.lower, upper);
+    add(leg.foot, upper);
 
     const soleHeight = 0.026;
     const sole = mesh(new BoxGeometry(foot.width + 3 * CLOTH_MARGIN, soleHeight, foot.depth + 3.5 * CLOTH_MARGIN), detail, "sole");
     sole.position.set(0, foot.y - foot.height / 2 + soleHeight / 2 - 0.012, foot.z);
-    add(leg.lower, sole);
+    add(leg.foot, sole);
 
     if (params.shaft > 0) {
       add(leg.lower, latheMesh(segmentShell(shape.shin, 1 - params.shaft, 1, CLOTH_MARGIN * 1.4), LIMB_SEGMENTS, material, "shaft"));

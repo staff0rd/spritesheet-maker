@@ -1,5 +1,5 @@
 import { fitSkirts } from "./parts/skirtFit";
-import { ARMS, LEGS, type JointName, type Rig } from "./rig";
+import { ARMS, bodyShape, LEGS, type JointName, type Rig } from "./rig";
 
 export type Pose = Partial<Record<JointName | "lift", number>>;
 
@@ -12,24 +12,90 @@ interface Clip {
 }
 
 const WALK_FRAMES = 6;
-const WALK_THIGH = 0.45;
-const WALK_KNEE = 0.75;
-const WALK_ARM = 0.4;
+const WALK_STRIDE = 1.05;
+const WALK_FOOT_REACH = WALK_STRIDE / 4;
+const WALK_STANCE_SHARE = 0.5;
+const WALK_STANCE_REACH = 0.918;
+const WALK_FOOT_LIFT = 0.3;
+const WALK_SWING_SNAP = 0.3;
+const WALK_ARM = 0.35;
 const WALK_ELBOW = -0.3;
 const IDLE_FRAMES = 6;
 const IDLE_LIFT = 0.028;
 const IDLE_ARM = 0.06;
 
-function walkPose(phase: number): Pose {
-  const swing = Math.sin(phase);
+const WALK_FOOT_PITCH = [-0.15, 0, 0, 0.25, 0.15, -0.05];
+
+const STANDARD_SHAPE = bodyShape({ height: 1, build: 1, shoulders: 1, hips: 1 });
+const THIGH_LENGTH = STANDARD_SHAPE.thigh.length;
+const SHIN_LENGTH = STANDARD_SHAPE.hip.y - STANDARD_SHAPE.thigh.length;
+
+function soleBelowAnkle(foot: Rig["shape"]["foot"], pitch: number): number {
+  return Math.max(...[foot.z - foot.depth / 2, foot.z + foot.depth / 2].map((edge) => edge * Math.sin(pitch)));
+}
+
+function hipToSole(shape: Rig["shape"], thigh: number, shin: number, pitch: number): number {
+  const shinLength = shape.hip.y - shape.thigh.length;
+  return shape.thigh.length * Math.cos(thigh) + shinLength * Math.cos(shin) + soleBelowAnkle(shape.foot, pitch);
+}
+
+function cyclic(keys: readonly number[], cycle: number): number {
+  const position = cycle * keys.length;
+  const index = Math.floor(position);
+  const blend = position - index;
+  return keys[index % keys.length] * (1 - blend) + keys[(index + 1) % keys.length] * blend;
+}
+
+interface FootTarget {
+  forward: number;
+  lift: number;
+  pitch: number;
+  planted: boolean;
+}
+
+function footTarget(legCycle: number): FootTarget {
+  const cycle = legCycle - Math.floor(legCycle);
+  return { ...footPath(cycle), pitch: cyclic(WALK_FOOT_PITCH, cycle) };
+}
+
+function footPath(cycle: number): Omit<FootTarget, "pitch"> {
+  if (cycle <= WALK_STANCE_SHARE) {
+    const stance = cycle / WALK_STANCE_SHARE;
+    return { forward: WALK_FOOT_REACH * (1 - 2 * stance), lift: 0, planted: true };
+  }
+  const swing = (cycle - WALK_STANCE_SHARE) / (1 - WALK_STANCE_SHARE);
+  const across = -Math.cos(Math.PI * swing);
+  return {
+    forward: WALK_FOOT_REACH * Math.sign(across) * Math.abs(across) ** WALK_SWING_SNAP,
+    lift: WALK_FOOT_LIFT * Math.sin(Math.PI * swing) * (1 - swing) ** 2,
+    planted: false,
+  };
+}
+
+function lawOfCosines(a: number, b: number, opposite: number): number {
+  return Math.acos(Math.min(1, Math.max(-1, (a * a + b * b - opposite * opposite) / (2 * a * b))));
+}
+
+function ankleAngles(forward: number, drop: number): { thigh: number; knee: number } {
+  const span = Math.min(Math.hypot(forward, drop), THIGH_LENGTH + SHIN_LENGTH);
+  const thigh = -(Math.atan2(forward, drop) + lawOfCosines(THIGH_LENGTH, span, SHIN_LENGTH));
+  return { thigh, knee: Math.PI - lawOfCosines(THIGH_LENGTH, SHIN_LENGTH, span) };
+}
+
+function walkPose(cycle: number): Pose {
+  const feet = [cycle, cycle + 0.5].map(footTarget);
+  const hipHeight = Math.min(
+    ...feet.filter((foot) => foot.planted).map((foot) => Math.sqrt(WALK_STANCE_REACH ** 2 - foot.forward ** 2)),
+  );
   const pose: Pose = {};
-  for (const [index, side] of [1, -1].entries()) {
-    const leg = LEGS[index];
-    const arm = ARMS[index];
-    pose[leg.upper] = -WALK_THIGH * swing * side;
-    pose[leg.lower] = WALK_KNEE * Math.max(0, Math.cos(phase) * side);
-    pose[arm.upper] = WALK_ARM * swing * side;
-    pose[arm.lower] = WALK_ELBOW;
+  for (const [index, foot] of feet.entries()) {
+    const ankleDrop = hipHeight - foot.lift - soleBelowAnkle(STANDARD_SHAPE.foot, foot.pitch);
+    const { thigh, knee } = ankleAngles(foot.forward, ankleDrop);
+    pose[LEGS[index].upper] = thigh;
+    pose[LEGS[index].lower] = knee;
+    pose[LEGS[index].foot] = foot.pitch - thigh - knee;
+    pose[ARMS[index].upper] = (WALK_ARM * foot.forward) / WALK_FOOT_REACH;
+    pose[ARMS[index].lower] = WALK_ELBOW;
   }
   return pose;
 }
@@ -54,7 +120,7 @@ export const CLIPS: readonly Clip[] = [
   {
     name: "walk",
     fps: 8,
-    poses: Array.from({ length: WALK_FRAMES }, (_, frame) => walkPose((frame / WALK_FRAMES) * 2 * Math.PI)),
+    poses: Array.from({ length: WALK_FRAMES }, (_, frame) => walkPose(frame / WALK_FRAMES)),
   },
 ];
 
@@ -73,11 +139,10 @@ export function sheetFrames(clips: readonly Clip[]): {
   return { poses, animations };
 }
 
-function legReach(rig: Rig, upper: JointName, lower: JointName): number {
-  const { shape, joints } = rig;
-  const thigh = joints[upper].rotation.x;
-  const shin = thigh + joints[lower].rotation.x;
-  return shape.thigh.length * Math.cos(thigh) + (shape.hip.y - shape.thigh.length) * Math.cos(shin);
+function legReach(rig: Rig, leg: (typeof LEGS)[number]): number {
+  const thigh = rig.joints[leg.upper].rotation.x;
+  const shin = thigh + rig.joints[leg.lower].rotation.x;
+  return hipToSole(rig.shape, thigh, shin, shin + rig.joints[leg.foot].rotation.x);
 }
 
 export function applyPose(rig: Rig, pose: Pose): void {
@@ -88,7 +153,7 @@ export function applyPose(rig: Rig, pose: Pose): void {
   for (const name of UPPER_BODY) rig.joints[name].position.y = lift;
   rig.joints.armLeft.position.y += rig.shape.shoulder.y;
   rig.joints.armRight.position.y += rig.shape.shoulder.y;
-  const reach = Math.max(...LEGS.map((leg) => legReach(rig, leg.upper, leg.lower)));
+  const reach = Math.max(...LEGS.map((leg) => legReach(rig, leg)));
   rig.root.position.y = (reach - rig.shape.hip.y) * rig.shape.height;
   fitSkirts(rig);
 }
