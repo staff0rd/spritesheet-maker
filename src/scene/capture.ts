@@ -16,7 +16,7 @@ function rendererFor(frameSize: Size): WebGLRenderer {
   return sharedRenderer;
 }
 
-function createLitScene(): Scene {
+export function createLitScene(): Scene {
   const scene = new Scene();
   scene.add(new HemisphereLight(0xffffff, 0x606060, 1.6));
   const key = new DirectionalLight(0xffffff, 1.8);

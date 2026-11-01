@@ -28,3 +28,12 @@ run:
     args:
       - test
     quiet: true
+  - name: dev
+    command: npm
+    args:
+      - run
+      - dev
+      - --
+      - --host
+    server: true
+    port: 5173

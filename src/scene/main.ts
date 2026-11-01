@@ -2,15 +2,20 @@ import { PART_CATALOG } from "../core/catalog";
 import { DEFAULT_CAPTURE_CONFIG } from "../core/config";
 import { planSheets } from "../core/parts";
 import { renderSheet } from "./capture";
+import { mountViewer } from "./viewer";
 
 window.spritesheet = { renderSheet };
 
-if (!navigator.webdriver) {
+function showSheets(): void {
+  document.body.style.margin = "16px";
+  const back = document.createElement("a");
+  back.href = "?";
+  back.textContent = "← 3D viewer";
   const grid = document.createElement("div");
   grid.style.display = "flex";
   grid.style.flexWrap = "wrap";
   grid.style.gap = "12px";
-  document.body.append(grid);
+  document.body.append(back, grid);
 
   for (const job of planSheets(PART_CATALOG)) {
     const figure = document.createElement("figure");
@@ -25,4 +30,9 @@ if (!navigator.webdriver) {
     figure.append(preview, caption);
     grid.append(figure);
   }
+}
+
+if (!navigator.webdriver) {
+  if (new URLSearchParams(location.search).get("view") === "sheets") showSheets();
+  else mountViewer(document.body);
 }
