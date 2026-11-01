@@ -2,6 +2,7 @@ import * as Phaser from "phaser";
 import { layersFor, pickCharacter, type Character, type Layer } from "../core/compose";
 import type { Direction } from "../core/directions";
 import type { Manifest } from "../core/manifest";
+import type { DrawSlot } from "../core/parts";
 import { createRandom, hashString, type Random } from "../core/random";
 import {
   animationFrame,
@@ -26,7 +27,7 @@ const WANDER: WanderConfig = {
 interface Walker {
   character: Character;
   container: Phaser.GameObjects.Container;
-  sprites: Map<string, Phaser.GameObjects.Sprite>;
+  sprites: Map<DrawSlot, Phaser.GameObjects.Sprite>;
   wanderer: Wanderer;
   random: Random;
   direction: Direction;
@@ -116,7 +117,7 @@ class CrowdScene extends Phaser.Scene {
     this.walkers = this.crowd.map(({ character, layers, wanderer, random, phase }) => {
       const sprites = new Map(
         layers.map((layer) => [
-          layer.category,
+          layer.slot,
           this.add
             .sprite(0, 0, layer.file)
             .setOrigin(anchor.x / frameSize.width, anchor.y / frameSize.height)
@@ -164,7 +165,7 @@ class CrowdScene extends Phaser.Scene {
     if (wanderer.direction !== walker.direction) {
       walker.direction = wanderer.direction;
       for (const layer of layersFor(this.manifest, walker.character, walker.direction)) {
-        const sprite = walker.sprites.get(layer.category);
+        const sprite = walker.sprites.get(layer.slot);
         if (sprite) walker.container.bringToTop(sprite);
       }
     }

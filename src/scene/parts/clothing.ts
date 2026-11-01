@@ -1,5 +1,5 @@
 import { BoxGeometry, IcosahedronGeometry } from "three";
-import { ARMS, LEGS, LIMB_SEGMENTS, TORSO_SEGMENTS } from "../rig";
+import { ARMS, type BodyShape, LEGS, LIMB_SEGMENTS, type Profile, TORSO_SEGMENTS } from "../rig";
 import { enclosingShell, latheMesh, mesh, radiusAt, segmentShell } from "./geometry";
 import { makeFittedSkirt } from "./skirtFit";
 import { definePart, type BuildContext } from "./types";
@@ -36,26 +36,29 @@ function buildShirt({ rig: { shape }, material, detail, add }: BuildContext, par
     }
   }
 
-  if (params.collar) {
-    const radius = shape.neck.radius + margin + 0.014;
-    const collar = latheMesh(
-      [
-        [radius, shape.neck.y - 0.04],
-        [radius * 1.15, shape.neck.y + 0.06],
-      ],
-      LIMB_SEGMENTS,
-      detail,
-      "collar",
-    );
-    add("torso", collar);
-  }
+  if (params.collar) add("torso", latheMesh(collarProfile(shape, margin), LIMB_SEGMENTS, detail, "collar"));
 
   if (params.hood) {
-    const hood = mesh(new IcosahedronGeometry(0.1, 0), detail, "hood");
-    hood.scale.set(1.3, 0.75, 0.7);
-    hood.position.set(0, 1.5, -radiusAt(shape.torso, 1.5) * shape.torsoDepth - 0.02);
+    const hood = mesh(new IcosahedronGeometry(HOOD_RADIUS, 0), detail, "hood");
+    hood.scale.set(...HOOD_SCALE);
+    hood.position.set(...hoodCentre(shape));
     add("torso", hood);
   }
+}
+
+export const HOOD_RADIUS = 0.1;
+export const HOOD_SCALE = [1.3, 0.75, 0.7] as const;
+
+export function hoodCentre(shape: BodyShape): [number, number, number] {
+  return [0, 1.5, -radiusAt(shape.torso, 1.5) * shape.torsoDepth - 0.02];
+}
+
+export function collarProfile(shape: BodyShape, margin: number): Profile {
+  const radius = shape.neck.radius + margin + 0.014;
+  return [
+    [radius, shape.neck.y - 0.04],
+    [radius * 1.15, shape.neck.y + 0.06],
+  ];
 }
 
 type TrouserParams = {

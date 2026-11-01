@@ -35,12 +35,12 @@ function dispose(scene: Scene): void {
   });
 }
 
-export function renderSheet({ config, poses, body, part }: RenderSheetRequest): string {
+export function renderSheet({ config, poses, body, part, front }: RenderSheetRequest): string {
   const layout = computeSheetLayout(config.frameSize, config.directions, poses.length);
   const renderer = rendererFor(config.frameSize);
   const scene = createLitScene();
   const camera = createIsometricCamera(config);
-  const rig = buildCharacter(proceduralProvider, { seed: config.seed, body, part });
+  const rig = buildCharacter(proceduralProvider, { seed: config.seed, body, part, front });
   const character = rig.root;
   scene.add(character);
 

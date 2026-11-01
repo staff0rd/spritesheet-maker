@@ -3,12 +3,14 @@ import type { PartParams, PartSpec } from "../../core/parts";
 import type { Random } from "../../core/random";
 import type { JointName, Rig } from "../rig";
 
+export type PartLayer = "main" | "front";
+
 export interface BuildContext {
   rig: Rig;
   random: Random;
   material: Material;
   detail: Material;
-  add(joint: JointName, object: Object3D): void;
+  add(joint: JointName, object: Object3D, layer?: PartLayer): void;
 }
 
 export interface PartProvider {

@@ -69,30 +69,51 @@ describe("layersFor", () => {
   };
 
   it("stacks layers in the manifest draw order, skipping absent categories", () => {
-    expect(layersFor(manifest, character, "SE").map((layer) => layer.category)).toEqual([
+    expect(layersFor(manifest, character, "SE").map((layer) => layer.slot)).toEqual([
       "body",
       "shoes",
       "bottom",
       "hair",
       "top",
+      "hair.front",
     ]);
-    expect(layersFor(manifest, character, "NW").map((layer) => layer.category)).toEqual([
+    expect(layersFor(manifest, character, "NW").map((layer) => layer.slot)).toEqual([
       "body",
       "shoes",
       "bottom",
       "top",
       "hair",
+      "hair.front",
     ]);
   });
 
   it("uses the sheet fitted to the picked body and carries each tint", () => {
     expect(layersFor(manifest, character, "SW")).toEqual([
-      { category: "body", file: "body/broad.png", tint: "#8d5524" },
-      { category: "shoes", file: "shoes/boots.broad.png", tint: "#8b5a2b" },
-      { category: "bottom", file: "bottom/skirt.broad.png", tint: "#2b2b2b" },
-      { category: "hair", file: "hair/long.broad.png", tint: "#1b1612" },
-      { category: "top", file: "top/hoodie.broad.png", tint: "#2e86c1" },
+      { slot: "body", category: "body", file: "body/broad.png", tint: "#8d5524" },
+      { slot: "shoes", category: "shoes", file: "shoes/boots.broad.png", tint: "#8b5a2b" },
+      { slot: "bottom", category: "bottom", file: "bottom/skirt.broad.png", tint: "#2b2b2b" },
+      { slot: "hair", category: "hair", file: "hair/long.broad.png", tint: "#1b1612" },
+      { slot: "top", category: "top", file: "top/hoodie.broad.png", tint: "#2e86c1" },
+      { slot: "hair.front", category: "hair", file: "hair/long.front.broad.png", tint: "#1b1612" },
     ]);
+  });
+
+  it("stacks the front layer after the top facing the camera and after the hair facing away, under the hat", () => {
+    const hatted: Character = { parts: { ...character.parts, hat: { variant: "beanie", tint: "#f1c40f" } } };
+    const slots = (direction: "SE" | "NE") => layersFor(manifest, hatted, direction).map((layer) => layer.slot);
+
+    expect(slots("SE").slice(-3)).toEqual(["top", "hair.front", "hat"]);
+    expect(slots("NE").slice(-3)).toEqual(["hair", "hair.front", "hat"]);
+  });
+
+  it.each(["buzz", "short", "bob", "spiky", "bun", "afro"])("adds no front layer for %s hair", (variant) => {
+    const other: Character = { parts: { ...character.parts, hair: { variant, tint: "#1b1612" } } };
+
+    for (const direction of manifest.directions) {
+      const slots = layersFor(manifest, other, direction).map((layer) => layer.slot);
+      expect(slots).toContain("hair");
+      expect(slots).not.toContain("hair.front");
+    }
   });
 
   it("rejects variants missing from the manifest", () => {

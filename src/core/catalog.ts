@@ -1,7 +1,7 @@
-import type { CategoryId, PartCatalog } from "./parts";
+import type { DrawSlot, PartCatalog } from "./parts";
 
-const FACING_CAMERA: readonly CategoryId[] = ["body", "shoes", "bottom", "hair", "top", "hat"];
-const FACING_AWAY: readonly CategoryId[] = ["body", "shoes", "bottom", "top", "hair", "hat"];
+const FACING_CAMERA: readonly DrawSlot[] = ["body", "shoes", "bottom", "hair", "top", "hair.front", "hat"];
+const FACING_AWAY: readonly DrawSlot[] = ["body", "shoes", "bottom", "top", "hair", "hair.front", "hat"];
 
 export const PART_CATALOG: PartCatalog = {
   baseCategory: "body",
@@ -24,7 +24,7 @@ export const PART_CATALOG: PartCatalog = {
         { id: "buzz", kind: "crop", params: { coverage: 0.5, tilt: 0.3, radius: 0.142 } },
         { id: "short", kind: "crop", params: {} },
         { id: "bob", kind: "bob", params: {} },
-        { id: "long", kind: "long", params: {} },
+        { id: "long", kind: "long", params: {}, front: true },
         { id: "spiky", kind: "spiky", params: {} },
         { id: "bun", kind: "bun", params: {} },
         { id: "afro", kind: "afro", params: {} },

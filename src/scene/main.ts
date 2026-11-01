@@ -23,7 +23,7 @@ function showSheets(): void {
     const figure = document.createElement("figure");
     figure.style.margin = "0";
     const preview = document.createElement("img");
-    preview.src = renderSheet({ config: DEFAULT_CAPTURE_CONFIG, poses, body: job.body, part: job.part });
+    preview.src = renderSheet({ config: DEFAULT_CAPTURE_CONFIG, poses, body: job.body, part: job.part, front: job.front });
     preview.style.imageRendering = "pixelated";
     preview.style.height = "384px";
     const caption = document.createElement("figcaption");

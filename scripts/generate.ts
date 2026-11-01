@@ -46,6 +46,7 @@ async function main(): Promise<void> {
         poses,
         body: job.body,
         part: job.part,
+        front: job.front,
       };
       const dataUrl = await page.evaluate((req) => window.spritesheet!.renderSheet(req), request);
       const path = resolve(OUT_DIR, job.file);

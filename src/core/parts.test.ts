@@ -23,6 +23,16 @@ describe("PART_CATALOG", () => {
       expect(drawOrder[direction].indexOf("hair")).toBeGreaterThan(drawOrder[direction].indexOf("top"));
     }
   });
+
+  it("draws the hair front layer after the top facing the camera and after the hair facing away", () => {
+    const { drawOrder } = PART_CATALOG;
+    for (const direction of ["SE", "SW"] as const) {
+      expect(drawOrder[direction].indexOf("hair.front")).toBe(drawOrder[direction].indexOf("top") + 1);
+    }
+    for (const direction of ["NE", "NW"] as const) {
+      expect(drawOrder[direction].indexOf("hair.front")).toBe(drawOrder[direction].indexOf("hair") + 1);
+    }
+  });
 });
 
 describe("validateCatalog", () => {
@@ -50,19 +60,49 @@ describe("validateCatalog", () => {
   ])("rejects %s", (_, catalog) => {
     expect(() => validateCatalog(catalog, DIRECTIONS)).toThrow();
   });
+
+  const fronted: PartCatalog = {
+    ...valid,
+    categories: [valid.categories[0], { ...valid.categories[1], variants: [{ id: "cap", kind: "baseball-cap", params: {}, front: true }] }],
+    drawOrder: { NE: ["body", "hat", "hat.front"], SE: ["body", "hat", "hat.front"], SW: ["body", "hat", "hat.front"], NW: ["body", "hat", "hat.front"] },
+  };
+
+  it("accepts a front layer drawn after its category", () => {
+    expect(() => validateCatalog(fronted, DIRECTIONS)).not.toThrow();
+  });
+
+  it.each<[string, PartCatalog]>([
+    ["a front variant without a front slot", { ...fronted, drawOrder: valid.drawOrder }],
+    ["a front slot without a front variant", { ...valid, drawOrder: fronted.drawOrder }],
+    ["a front slot before its category", { ...fronted, drawOrder: { ...fronted.drawOrder, SE: ["body", "hat.front", "hat"] } }],
+    [
+      "a front base variant",
+      { ...fronted, categories: [{ ...fronted.categories[0], variants: [{ id: "average", kind: "humanoid", params: {}, front: true }] }, fronted.categories[1]] },
+    ],
+  ])("rejects %s", (_, catalog) => {
+    expect(() => validateCatalog(catalog, DIRECTIONS)).toThrow();
+  });
 });
 
 describe("planSheets", () => {
   const jobs = planSheets(PART_CATALOG);
   const bodies = PART_CATALOG.categories[0].variants.map((variant) => variant.id);
 
-  it("renders each body once and every other variant once per body", () => {
+  it("renders each body once and every other variant once per body, plus a front sheet per body for front variants", () => {
     const expected = PART_CATALOG.categories.reduce(
-      (total, category) => total + category.variants.length * (category.id === "body" ? 1 : bodies.length),
+      (total, category) =>
+        total +
+        category.variants.reduce((sum, variant) => sum + (category.id === "body" ? 1 : bodies.length * (variant.front ? 2 : 1)), 0),
       0,
     );
     expect(jobs).toHaveLength(expected);
     expect(new Set(jobs.map((job) => job.file)).size).toBe(jobs.length);
+  });
+
+  it("plans front sheets only for long hair", () => {
+    expect(jobs.filter((job) => job.front).map((job) => job.file)).toEqual(
+      bodies.map((body) => `hair/long.front.${body}.png`),
+    );
   });
 
   it("renders body sheets in colour and other parts over a depth-only body", () => {
