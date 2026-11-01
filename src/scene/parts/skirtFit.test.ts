@@ -2,7 +2,6 @@ import { type BufferAttribute, type LatheGeometry, type Mesh, Vector3 } from "th
 import { describe, expect, it } from "vitest";
 import { PART_CATALOG } from "../../core/catalog";
 import { planSheets } from "../../core/parts";
-import { RENDER_STYLES } from "../../core/style";
 import { applyPose, CLIPS, sheetFrames } from "../animation";
 import { buildCharacter } from "../character";
 import type { Rig } from "../rig";
@@ -87,10 +86,10 @@ function exposedLegPoints(rig: Rig): number {
 }
 
 describe("fitSkirts", () => {
-  it.each(RENDER_STYLES.flatMap((style) => skirtJobs.map((job) => [`${style} ${job.bodyVariant}/${job.variant}`, job, style] as const)))(
+  it.each(skirtJobs.map((job) => [`${job.bodyVariant}/${job.variant}`, job] as const))(
     "keeps the %s legs inside the skirt in every frame",
-    (_, job, style) => {
-      const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part, style });
+    (_, job) => {
+      const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part });
       for (const pose of sheetFrames(CLIPS).poses) {
         applyPose(rig, pose);
         expect(exposedLegPoints(rig)).toBe(0);

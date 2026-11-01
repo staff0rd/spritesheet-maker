@@ -2,7 +2,6 @@ import { type LatheGeometry, Mesh, type Object3D } from "three";
 import { describe, expect, it } from "vitest";
 import { PART_CATALOG } from "../../core/catalog";
 import { planSheets } from "../../core/parts";
-import { RENDER_STYLES } from "../../core/style";
 import { buildCharacter } from "../character";
 import type { Profile } from "../rig";
 import { proceduralProvider } from "./procedural";
@@ -54,9 +53,9 @@ function sphereProfile(radius: number, steps = 32): [number, number][] {
   });
 }
 
-describe.each(RENDER_STYLES)("%s clothing shells", (style) => {
+describe("clothing shells", () => {
   it.each(clothingJobs.map((job) => [`${job.bodyVariant}/${job.variant}`, job] as const))("enclose the %s body", (_, job) => {
-    const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part, style });
+    const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part });
     const found = meshes(rig.root);
     const shells = found.filter((mesh) => SHELLS.includes(mesh.name));
     for (const shell of shells) {
@@ -68,11 +67,11 @@ describe.each(RENDER_STYLES)("%s clothing shells", (style) => {
   });
 });
 
-describe.each(RENDER_STYLES)("%s skirts", (style) => {
+describe("skirts", () => {
   const skirtJobs = clothingJobs.filter((job) => job.part?.kind === "skirt");
 
   it.each(skirtJobs.map((job) => [`${job.bodyVariant}/${job.variant}`, job] as const))("cover the %s hips up to the waist", (_, job) => {
-    const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part, style });
+    const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part });
     const found = meshes(rig.root);
     const named = (name: string) => profileOf(found.find((mesh) => mesh.name === name)!);
     const [skirt, waistband] = [named("skirt"), named("waistband")];
@@ -81,7 +80,7 @@ describe.each(RENDER_STYLES)("%s skirts", (style) => {
   });
 });
 
-describe("smooth joint spheres", () => {
+describe("joint spheres", () => {
   const covering = [
     { variant: "longsleeve", joint: "elbow", upper: "upperArm", lower: "forearm" },
     { variant: "trousers", joint: "knee", upper: "thigh", lower: "shin" },
@@ -89,7 +88,7 @@ describe("smooth joint spheres", () => {
 
   it.each(covering)("are enclosed by $variant at the $joint", ({ variant, joint, upper, lower }) => {
     const job = clothingJobs.find((candidate) => candidate.variant === variant)!;
-    const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part, style: "smooth" });
+    const rig = buildCharacter(proceduralProvider, { seed: 1, body: job.body, part: job.part });
     const found = meshes(rig.root);
     const sphere = found.find((mesh) => mesh.name === joint)!;
     const shellOn = (name: string) => {

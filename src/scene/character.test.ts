@@ -1,9 +1,10 @@
-import { type Material, Mesh, type Object3D } from "three";
+import { type LatheGeometry, type Material, Mesh, type MeshLambertMaterial, type Object3D } from "three";
 import { describe, expect, it } from "vitest";
 import { PART_CATALOG } from "../core/catalog";
 import { planSheets, type PartSpec } from "../core/parts";
 import { buildCharacter } from "./character";
 import { proceduralProvider } from "./parts/procedural";
+import { LIMB_SEGMENTS, TORSO_SEGMENTS } from "./rig";
 
 function meshes(root: Object3D): Mesh[] {
   const found: Mesh[] = [];
@@ -75,5 +76,26 @@ describe("buildCharacter", () => {
   it("varies seeded parts with the seed", () => {
     const build = (seed: number) => snapshot(buildCharacter(proceduralProvider, { seed, body, part: spiky }).root);
     expect(build(1)).not.toEqual(build(2));
+  });
+});
+
+describe("smooth body", () => {
+  const found = meshes(buildCharacter(proceduralProvider, { seed: 1, body }).root);
+  const named = (name: string) => found.filter((mesh) => mesh.name === name);
+
+  it("uses smooth shading", () => {
+    expect(found.every((mesh) => (mesh.material as MeshLambertMaterial).flatShading === false)).toBe(true);
+  });
+
+  it("uses high side counts for the torso and limbs", () => {
+    expect((named("torso")[0].geometry as LatheGeometry).parameters.segments).toBe(TORSO_SEGMENTS);
+    for (const limb of ["upperArm", "forearm", "thigh", "shin"]) {
+      expect(named(limb).map((mesh) => (mesh.geometry as LatheGeometry).parameters.segments)).toEqual([LIMB_SEGMENTS, LIMB_SEGMENTS]);
+    }
+  });
+
+  it("adds joint spheres at elbows and knees", () => {
+    expect(named("elbow").map((mesh) => mesh.parent?.name).sort()).toEqual(["elbowLeft", "elbowRight"]);
+    expect(named("knee").map((mesh) => mesh.parent?.name).sort()).toEqual(["kneeLeft", "kneeRight"]);
   });
 });

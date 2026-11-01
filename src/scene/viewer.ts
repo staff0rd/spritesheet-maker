@@ -2,7 +2,6 @@ import { GridHelper, type Group, Mesh, PerspectiveCamera, WebGLRenderer } from "
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PART_CATALOG } from "../core/catalog";
 import type { CategoryId, PartSpec } from "../core/parts";
-import { RENDER_STYLES, type RenderStyle } from "../core/style";
 import { createLitScene } from "./capture";
 import { applyPose, CLIPS } from "./animation";
 import { buildDressedCharacter, type TintedPart } from "./character";
@@ -46,7 +45,7 @@ function disposeCharacter(character: Group): void {
   });
 }
 
-export function mountViewer(container: HTMLElement, initialStyle: RenderStyle): void {
+export function mountViewer(container: HTMLElement): void {
   document.body.style.margin = "0";
   document.body.style.overflow = "hidden";
   const scene = createLitScene();
@@ -88,10 +87,13 @@ export function mountViewer(container: HTMLElement, initialStyle: RenderStyle): 
   randomise.type = "button";
   randomise.textContent = "Random outfit";
   const sheets = document.createElement("a");
+  sheets.href = "?view=sheets";
   sheets.textContent = "View rendered sheets";
   const crowd = document.createElement("a");
+  crowd.href = "/preview.html";
   crowd.textContent = "Crowd preview (from out/)";
   const phaser = document.createElement("a");
+  phaser.href = "/phaser.html";
   phaser.textContent = "Phaser crowd (from out/)";
   panel.append(labelled("seed", seed), randomise, sheets, crowd, phaser);
 
@@ -99,11 +101,6 @@ export function mountViewer(container: HTMLElement, initialStyle: RenderStyle): 
   animation.add(new Option("rest", NONE));
   for (const clip of CLIPS) animation.add(new Option(clip.name, clip.name));
   panel.append(labelled("anim", animation));
-
-  const style = document.createElement("select");
-  for (const option of RENDER_STYLES) style.add(new Option(option, option));
-  style.value = initialStyle;
-  panel.append(labelled("style", style));
 
   let character: Rig | undefined;
 
@@ -125,10 +122,7 @@ export function mountViewer(container: HTMLElement, initialStyle: RenderStyle): 
       disposeCharacter(character.root);
     }
     const { body, parts } = selected();
-    sheets.href = `?view=sheets&style=${style.value}`;
-    crowd.href = `/preview.html?style=${style.value}`;
-    phaser.href = `/phaser.html?style=${style.value}`;
-    character = buildDressedCharacter(proceduralProvider, Number(seed.value) || 0, body, parts, style.value as RenderStyle);
+    character = buildDressedCharacter(proceduralProvider, Number(seed.value) || 0, body, parts);
     scene.add(character.root);
   }
 

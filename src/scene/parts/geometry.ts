@@ -1,7 +1,6 @@
-import { BoxGeometry, type BufferGeometry, IcosahedronGeometry, LatheGeometry, type Material, Mesh, SphereGeometry, Vector2 } from "three";
+import { type BufferGeometry, LatheGeometry, type Material, Mesh, SphereGeometry, Vector2 } from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import type { RenderStyle } from "../../core/style";
-import { type BodyShape, type Profile, type Segment, STYLE_SEGMENTS } from "../rig";
+import { type BodyShape, LIMB_SEGMENTS, type Profile, type Segment } from "../rig";
 
 export function mesh(geometry: BufferGeometry, material: Material, name: string): Mesh {
   const result = new Mesh(geometry, material);
@@ -16,15 +15,6 @@ export function latheMesh(profile: Profile, segments: number, material: Material
   );
   geometry.scale(1, 1, depthScale);
   return mesh(geometry, material, name);
-}
-
-function segmentProfile({ length, top, bottom }: Segment): Profile {
-  return [
-    [0, -length],
-    [bottom, -length],
-    [top, 0],
-    [0, 0],
-  ];
 }
 
 function quarterArc(radius: number, centreY: number, from: number, to: number, steps: number): [number, number][] {
@@ -66,31 +56,12 @@ export function radiusAt(profile: Profile, y: number): number {
   return rim[rim.length - 1][0];
 }
 
-function enclosingShell(profile: Profile, fromY: number, toY: number, margin: number): Profile {
-  const ys = profile.map(([, y]) => y);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const low = Math.max(fromY, minY);
-  const high = Math.min(toY, maxY);
-  const inner = profile.filter(([radius, y]) => radius > 0 && y > low && y < high);
-  const points: [number, number][] = [[radiusAt(profile, low), low], ...inner, [radiusAt(profile, high), high]].map(
-    ([radius, y]) => [radius + margin, y],
-  );
-  if (fromY <= minY) points.unshift([0, minY - margin]);
-  if (toY >= maxY) points.push([0, maxY + margin]);
-  return points;
+export function torsoProfile(shape: BodyShape): Profile {
+  return roundedProfile(shape.torso);
 }
 
-function segmentShell(segment: Segment, fromFraction: number, toFraction: number, margin: number): Profile {
-  return enclosingShell(segmentProfile(segment), -toFraction * segment.length, -fromFraction * segment.length, margin);
-}
-
-export function torsoProfile(shape: BodyShape, style: RenderStyle): Profile {
-  return style === "smooth" ? roundedProfile(shape.torso) : shape.torso;
-}
-
-export function limbProfile(segment: Segment, style: RenderStyle): Profile {
-  return style === "smooth" ? capsuleProfile(segment) : segmentProfile(segment);
+export function limbProfile(segment: Segment): Profile {
+  return capsuleProfile(segment);
 }
 
 function offsetProfile(profile: Profile, margin: number): Profile {
@@ -120,27 +91,24 @@ function cutProfile(profile: Profile, fromY: number, toY: number): Profile {
   return points;
 }
 
-export function torsoShell(shape: BodyShape, style: RenderStyle, fromY: number, toY: number, margin: number): Profile {
-  if (style === "blocky") return enclosingShell(shape.torso, fromY, toY, margin);
-  return cutProfile(offsetProfile(torsoProfile(shape, style), margin), fromY, toY);
+export function torsoShell(shape: BodyShape, fromY: number, toY: number, margin: number): Profile {
+  return cutProfile(offsetProfile(torsoProfile(shape), margin), fromY, toY);
 }
 
-export function limbShell(segment: Segment, style: RenderStyle, fromFraction: number, toFraction: number, margin: number): Profile {
-  if (style === "blocky") return segmentShell(segment, fromFraction, toFraction, margin);
+export function limbShell(segment: Segment, fromFraction: number, toFraction: number, margin: number): Profile {
   const fromY = toFraction >= 1 ? -Infinity : -toFraction * segment.length;
   const toY = fromFraction <= 0 ? Infinity : -fromFraction * segment.length;
-  return cutProfile(offsetProfile(limbProfile(segment, style), margin), fromY, toY);
+  return cutProfile(offsetProfile(limbProfile(segment), margin), fromY, toY);
 }
 
-export function ballGeometry(style: RenderStyle, radius: number, detail: number): BufferGeometry {
-  const sides = STYLE_SEGMENTS[style].limb;
-  return style === "smooth" ? new SphereGeometry(radius, sides, sides / 2 + 2) : new IcosahedronGeometry(radius, detail);
+export function ballGeometry(radius: number): BufferGeometry {
+  return new SphereGeometry(radius, LIMB_SEGMENTS, LIMB_SEGMENTS / 2 + 2);
 }
 
 export function footRounding({ foot }: BodyShape): number {
   return Math.min(foot.width, foot.height) * 0.45;
 }
 
-export function boxGeometry(style: RenderStyle, width: number, height: number, depth: number, radius: number): BufferGeometry {
-  return style === "smooth" ? new RoundedBoxGeometry(width, height, depth, 3, radius) : new BoxGeometry(width, height, depth);
+export function boxGeometry(width: number, height: number, depth: number, radius: number): BufferGeometry {
+  return new RoundedBoxGeometry(width, height, depth, 3, radius);
 }
