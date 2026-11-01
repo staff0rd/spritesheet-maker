@@ -1,5 +1,5 @@
 import * as Phaser from "phaser";
-import { layersFor, pickCharacter, type Character, type Layer } from "../core/compose";
+import { layersFor, pickCharacter, type Character, type Layer, type VariantOverrides } from "../core/compose";
 import type { Direction } from "../core/directions";
 import type { Manifest } from "../core/manifest";
 import type { DrawSlot } from "../core/parts";
@@ -57,13 +57,14 @@ const seedInput = element<HTMLInputElement>("seed");
 const reseedButton = element<HTMLButtonElement>("reseed");
 const countInput = element<HTMLInputElement>("count");
 const countLabel = element<HTMLOutputElement>("count-label");
+const hairSelect = element<HTMLSelectElement>("hair");
 
-function planCrowd(manifest: Manifest, seed: number, size: number): CrowdMember[] {
+function planCrowd(manifest: Manifest, seed: number, size: number, overrides: VariantOverrides): CrowdMember[] {
   const random = createRandom(seed);
   const placement = createRandom(hashString(`floor:${seed}`));
   const { halfWidth, halfHeight } = WANDER.floor;
   return Array.from({ length: size }, (_, index) => {
-    const character = pickCharacter(manifest, random);
+    const character = pickCharacter(manifest, random, overrides);
     const direction = manifest.directions[Math.floor(random() * manifest.directions.length)];
     const phase = random();
     const { x, y } = diamondPoint(placement, halfWidth, halfHeight);
@@ -182,15 +183,17 @@ class CrowdScene extends Phaser.Scene {
   }
 }
 
-function readUrl(): { seed: number; size: number } {
+function readUrl(): { seed: number; size: number; hair: string } {
   const params = new URLSearchParams(location.search);
-  return { seed: Number(params.get("seed") ?? 1) || 0, size: crowdSize(params.get("count")) };
+  return { seed: Number(params.get("seed") ?? 1) || 0, size: crowdSize(params.get("count")), hair: params.get("hair") ?? "" };
 }
 
-function writeUrl(seed: number, size: number): void {
+function writeUrl(seed: number, size: number, hair: string): void {
   const params = new URLSearchParams(location.search);
   params.set("seed", String(seed));
   params.set("count", String(size));
+  if (hair) params.set("hair", hair);
+  else params.delete("hair");
   history.replaceState(null, "", `?${params}`);
 }
 
@@ -208,6 +211,8 @@ async function start(): Promise<void> {
   for (const name of ["walk", "idle"]) {
     if (!manifest.animations[name]) throw new Error(`Manifest has no ${name} animation`);
   }
+  for (const { id } of manifest.categories.hair?.variants ?? []) hairSelect.add(new Option(id, id));
+  hairSelect.value = initial.hair;
 
   const game = new Phaser.Game({
     type: Phaser.AUTO,
@@ -223,8 +228,9 @@ async function start(): Promise<void> {
     const seed = Number(seedInput.value) || 0;
     const size = crowdSize(countInput.value);
     countLabel.value = String(size);
-    writeUrl(seed, size);
-    const data: CrowdData = { crowd: planCrowd(manifest, seed, size) };
+    const hair = hairSelect.value;
+    writeUrl(seed, size, hair);
+    const data: CrowdData = { crowd: planCrowd(manifest, seed, size, { hair: hair || undefined }) };
     if (game.scene.getScene("crowd")) scene.scene.restart(data);
     else game.scene.add("crowd", scene, true, data);
     status.textContent = `seed ${seed} · ${size} characters`;
@@ -239,6 +245,7 @@ async function start(): Promise<void> {
     countLabel.value = countInput.value;
   });
   countInput.addEventListener("change", spawn);
+  hairSelect.addEventListener("change", spawn);
   element<HTMLFormElement>("controls").addEventListener("submit", (event) => event.preventDefault());
   setInterval(() => {
     fpsLabel.textContent = `${Math.round(game.loop.actualFps)} fps`;

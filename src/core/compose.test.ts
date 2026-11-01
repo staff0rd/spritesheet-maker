@@ -49,6 +49,22 @@ describe("pickCharacter", () => {
     expect(Object.keys(character.parts).sort()).toEqual(["body", "bottom", "shoes", "top"]);
   });
 
+  it("forces an overridden variant, even when the optional roll misses, without changing other picks", () => {
+    const plain = createRandom(5);
+    const forced = createRandom(5);
+    for (let index = 0; index < 50; index++) {
+      const expected = pickCharacter(manifest, plain);
+      const character = pickCharacter(manifest, forced, { hair: "long" });
+      expect(character.parts.hair?.variant).toBe("long");
+      expect({ ...character.parts, hair: undefined }).toEqual({ ...expected.parts, hair: undefined });
+    }
+    expect(pickCharacter(manifest, sequence(0.999), { hair: "long" }).parts.hair?.variant).toBe("long");
+  });
+
+  it("rejects an override for an unknown variant", () => {
+    expect(() => pickCharacter(manifest, createRandom(1), { hair: "mohawk" })).toThrow(/mohawk/);
+  });
+
   it("produces a diverse crowd", () => {
     const random = createRandom(1);
     const crowd = Array.from({ length: 100 }, () => JSON.stringify(pickCharacter(manifest, random)));

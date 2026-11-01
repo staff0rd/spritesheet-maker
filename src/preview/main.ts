@@ -18,6 +18,7 @@ const reseedButton = element<HTMLButtonElement>("reseed");
 const directionSelect = element<HTMLSelectElement>("direction");
 const scaleSelect = element<HTMLSelectElement>("scale");
 const animationSelect = element<HTMLSelectElement>("animation");
+const hairSelect = element<HTMLSelectElement>("hair");
 const status = element<HTMLSpanElement>("status");
 const fpsLabel = element<HTMLSpanElement>("fps");
 const canvas = element<HTMLCanvasElement>("crowd");
@@ -81,7 +82,7 @@ async function render(manifest: Manifest, loadSheet: (file: string) => Promise<H
   const random = createRandom(seed);
 
   const crowd = Array.from({ length: COLUMNS * ROWS }, () => {
-    const character = pickCharacter(manifest, random);
+    const character = pickCharacter(manifest, random, { hair: hairSelect.value || undefined });
     const direction = fixedDirection || manifest.directions[Math.floor(random() * manifest.directions.length)];
     const phase = random();
     return { direction, phase, layers: layersFor(manifest, character, direction) };
@@ -153,6 +154,8 @@ async function render(manifest: Manifest, loadSheet: (file: string) => Promise<H
   const params = new URLSearchParams(location.search);
   params.set("seed", String(seed));
   params.set("animation", animationSelect.value);
+  if (hairSelect.value) params.set("hair", hairSelect.value);
+  else params.delete("hair");
   history.replaceState(null, "", `?${params}`);
 }
 
@@ -168,13 +171,15 @@ async function start(): Promise<void> {
   for (const direction of manifest.directions) directionSelect.add(new Option(direction, direction));
   for (const name of Object.keys(manifest.animations)) animationSelect.add(new Option(name, name));
   animationSelect.value = params.get("animation") ?? ("walk" in manifest.animations ? "walk" : animationSelect.value);
+  for (const { id } of manifest.categories.hair?.variants ?? []) hairSelect.add(new Option(id, id));
+  hairSelect.value = params.get("hair") ?? "";
 
   const rerender = () => render(manifest, loadSheet).catch(showError);
   reseedButton.addEventListener("click", () => {
     seedInput.value = String(Math.floor(Math.random() * 1_000_000));
     rerender();
   });
-  for (const control of [seedInput, directionSelect, scaleSelect, animationSelect]) control.addEventListener("change", rerender);
+  for (const control of [seedInput, directionSelect, scaleSelect, animationSelect, hairSelect]) control.addEventListener("change", rerender);
   await render(manifest, loadSheet);
 }
 

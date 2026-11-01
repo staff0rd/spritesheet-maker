@@ -54,14 +54,20 @@ function categoriesOf(manifest: Manifest) {
   return Object.entries(manifest.categories).map(([id, category]) => ({ id: id as CategoryId, ...category! }));
 }
 
-export function pickCharacter(manifest: Manifest, random: Random): Character {
+export type VariantOverrides = Partial<Record<CategoryId, string>>;
+
+export function pickCharacter(manifest: Manifest, random: Random, overrides: VariantOverrides = {}): Character {
   const parts: Character["parts"] = {};
   for (const category of categoriesOf(manifest)) {
     const chance = OPTIONAL_CHANCE[category.id] ?? DEFAULT_OPTIONAL_CHANCE;
     const present = !category.optional || random() < chance;
-    const variant = pick(random, category.variants).id;
+    const picked = pick(random, category.variants).id;
     const tint = pick(random, PALETTES[category.tintGroup]);
-    if (present) parts[category.id] = { variant, tint };
+    const override = overrides[category.id];
+    if (override && !category.variants.some((variant) => variant.id === override)) {
+      throw new Error(`Unknown ${category.id} variant "${override}"`);
+    }
+    if (present || override) parts[category.id] = { variant: override ?? picked, tint };
   }
   if (!parts[manifest.baseCategory]) throw new Error(`Manifest has no "${manifest.baseCategory}" category`);
   return { parts };
