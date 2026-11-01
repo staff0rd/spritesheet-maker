@@ -87,7 +87,10 @@ export function mountViewer(container: HTMLElement): void {
   const sheets = document.createElement("a");
   sheets.href = "?view=sheets";
   sheets.textContent = "View rendered sheets";
-  panel.append(labelled("seed", seed), randomise, sheets);
+  const crowd = document.createElement("a");
+  crowd.href = "/preview.html";
+  crowd.textContent = "Crowd preview (from out/)";
+  panel.append(labelled("seed", seed), randomise, sheets, crowd);
 
   let character: Group | undefined;
 

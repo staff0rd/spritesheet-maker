@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Crowd preview</title>
+    <style>
+      body {
+        margin: 16px;
+        font: 13px system-ui;
+        background: #d8d4c8;
+      }
+      form {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      canvas {
+        image-rendering: pixelated;
+        max-width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="controls">
+      <a href="/">← 3D viewer</a>
+      <label>Seed <input id="seed" type="number" value="1" style="width: 90px" /></label>
+      <button id="reseed" type="button">Reseed</button>
+      <label>
+        Facing
+        <select id="direction">
+          <option value="">mixed</option>
+        </select>
+      </label>
+      <label>
+        Scale
+        <select id="scale">
+          <option value="1">1×</option>
+          <option value="2" selected>2×</option>
+          <option value="3">3×</option>
+        </select>
+      </label>
+      <span id="status"></span>
+    </form>
+    <canvas id="crowd"></canvas>
+    <script type="module" src="/src/preview/main.ts"></script>
+  </body>
+</html>

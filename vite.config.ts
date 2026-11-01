@@ -4,4 +4,9 @@ export default defineConfig({
   server: {
     allowedHosts: [".ts.net"],
   },
+  build: {
+    rollupOptions: {
+      input: { scene: "index.html", preview: "preview.html" },
+    },
+  },
 });

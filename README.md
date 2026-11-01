@@ -6,6 +6,7 @@ Renders procedural low-poly 3D characters in three.js and captures them as layer
 
 - `npm run generate [outDir]` — starts a Vite server, renders every part sheet in headless Chromium (Playwright) and writes them plus `manifest.json` to `out/` (or `outDir`).
 - `npm run dev` — opens the scene page in a browser and shows every rendered sheet.
+- `npm run dev` then open `/preview.html` — composites a reseedable grid of 120 random characters from `out/manifest.json` (or `?manifest=<url>`), picking a variant per category and a multiply tint from the skin/hair/cloth palettes in `src/core/compose.ts`, stacked in the manifest draw order.
 - `assist verify` — typecheck, lint, knip and tests.
 
 If Playwright's Chromium is missing, run `npx playwright install chromium`.
