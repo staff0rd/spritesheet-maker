@@ -92,7 +92,10 @@ export function mountViewer(container: HTMLElement): void {
   const crowd = document.createElement("a");
   crowd.href = "/preview.html";
   crowd.textContent = "Crowd preview (from out/)";
-  panel.append(labelled("seed", seed), randomise, sheets, crowd);
+  const phaser = document.createElement("a");
+  phaser.href = "/phaser.html";
+  phaser.textContent = "Phaser crowd (from out/)";
+  panel.append(labelled("seed", seed), randomise, sheets, crowd, phaser);
 
   const animation = document.createElement("select");
   animation.add(new Option("rest", NONE));

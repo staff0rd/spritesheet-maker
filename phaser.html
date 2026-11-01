@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phaser crowd</title>
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        font: 13px system-ui;
+        background: #2a2d33;
+        color: #ddd;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        padding: 8px 16px;
+      }
+      a {
+        color: #9cf;
+      }
+      #game {
+        flex: 1;
+        min-height: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/">← 3D viewer</a>
+      <a href="/preview.html">Crowd preview</a>
+      <span id="status"></span>
+    </nav>
+    <div id="game"></div>
+    <script type="module" src="/src/phaser/main.ts"></script>
+  </body>
+</html>
