@@ -62,26 +62,16 @@ export interface GridPoint {
   v: number;
 }
 
-export const STAIRWELL = { width: 0.12, back: 0.5, turn: 0.72, front: 0.8, opening: 0.4 } as const;
+export const UPPER_SIZE = 0.5;
+
+export const STAIRWELL = { width: 0.12, back: UPPER_SIZE, turn: 0.72, front: 0.8 } as const;
 
 export const SLAB_OUTLINE: readonly GridPoint[] = [
   { u: 0, v: 0 },
-  { u: 1, v: 0 },
-  { u: STAIRWELL.opening, v: 1 - STAIRWELL.opening },
-  { u: STAIRWELL.opening, v: STAIRWELL.back },
-  { u: 0, v: STAIRWELL.back },
+  { u: UPPER_SIZE, v: 0 },
+  { u: UPPER_SIZE, v: UPPER_SIZE },
+  { u: 0, v: UPPER_SIZE },
 ];
-
-interface Blocked {
-  uMax: number;
-  vMin: number;
-  vMax: number;
-}
-
-function blockedOn(level: number): Blocked {
-  const { width, back, front, opening } = STAIRWELL;
-  return level === 0 ? { uMax: width, vMin: back, vMax: front } : { uMax: opening, vMin: back, vMax: Infinity };
-}
 
 export function toScreen(floor: Floor, { u, v }: GridPoint, z = 0): Point {
   return { x: (u - v) * floor.halfWidth, y: (u + v - 1) * floor.halfHeight - z };
@@ -109,26 +99,26 @@ export function onLevel(floor: Floor, level: number, point: Point): boolean {
   const { u, v } = toGrid(floor, point);
   const epsilon = 1e-9;
   if (u < -epsilon || v < -epsilon || u > 1 + epsilon || v > 1 + epsilon) return false;
-  if (level > 0 && point.y > epsilon) return false;
-  const blocked = blockedOn(level);
-  return !(u <= blocked.uMax && v >= blocked.vMin && v <= blocked.vMax);
+  if (level > 0) return u <= UPPER_SIZE + epsilon && v <= UPPER_SIZE + epsilon;
+  return !(u <= STAIRWELL.width && v >= STAIRWELL.back && v <= STAIRWELL.front);
 }
 
 export function pickLevel(random: Random): number {
-  const ticket = random() * (LEVEL_COUNT + 1);
-  return ticket < 2 ? 0 : Math.min(LEVEL_COUNT - 1, Math.floor(ticket) - 1);
+  const upperArea = UPPER_SIZE * UPPER_SIZE;
+  const ticket = random() * (1 + (LEVEL_COUNT - 1) * upperArea);
+  return ticket < 1 ? 0 : Math.min(LEVEL_COUNT - 1, 1 + Math.floor((ticket - 1) / upperArea));
 }
 
 export function levelPoint(random: Random, floor: Floor, level: number): Point {
+  if (level > 0) return toScreen(floor, { u: random() * UPPER_SIZE, v: random() * UPPER_SIZE });
   for (;;) {
     const point = diamondPoint(random, floor.halfWidth, floor.halfHeight);
-    const placed = level > 0 && point.y > 0 ? { x: point.x, y: -point.y } : point;
-    if (onLevel(floor, level, placed)) return placed;
+    if (onLevel(floor, level, point)) return point;
   }
 }
 
 export function pathClear(floor: Floor, level: number, from: Point, to: Point): boolean {
-  const blocked = blockedOn(level);
+  if (level > 0) return true;
   const a = toGrid(floor, from);
   const b = toGrid(floor, to);
   let enter = 0;
@@ -141,7 +131,8 @@ export function pathClear(floor: Floor, level: number, from: Point, to: Point): 
     exit = Math.min(exit, Math.max(t0, t1));
     return enter <= exit;
   };
-  const hits = clip(a.u, b.u - a.u, -Infinity, blocked.uMax) && clip(a.v, b.v - a.v, blocked.vMin, blocked.vMax);
+  const hits =
+    clip(a.u, b.u - a.u, -Infinity, STAIRWELL.width) && clip(a.v, b.v - a.v, STAIRWELL.back, STAIRWELL.front);
   return !hits;
 }
 

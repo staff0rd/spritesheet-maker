@@ -16,7 +16,6 @@ import {
   pickLevel,
   SLAB_OUTLINE,
   slabDepth,
-  STAIRWELL,
   stairBoxes,
   stairDepth,
   stepWander,
@@ -173,14 +172,11 @@ class CrowdScene extends Phaser.Scene {
   private drawLevels(): void {
     const { floor } = WANDER;
     const at = (point: GridPoint, z: number) => toScreen(floor, point, z);
-    const { back, opening } = STAIRWELL;
     const east = { u: 1, v: 0 };
+    const [, slabEast, slabSouth, slabWest] = SLAB_OUTLINE;
     const edges = [
-      [{ u: opening, v: 1 - opening }, east],
-      [
-        { u: 0, v: back },
-        { u: opening, v: back },
-      ],
+      [slabWest, slabSouth],
+      [slabSouth, slabEast],
     ];
 
     const ground = this.add.graphics().setDepth(-Infinity);

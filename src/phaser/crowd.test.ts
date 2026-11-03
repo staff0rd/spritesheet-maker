@@ -30,6 +30,7 @@ import {
   tintColor,
   toGrid,
   toScreen,
+  UPPER_SIZE,
   wanderTarget,
   type WanderConfig,
   type Wanderer,
@@ -141,7 +142,6 @@ describe("toGrid", () => {
 describe("levelPoint", () => {
   const inStairwell = ({ u, v }: { u: number; v: number }) =>
     u <= STAIRWELL.width && v >= STAIRWELL.back && v <= STAIRWELL.front;
-  const inOpening = ({ u, v }: { u: number; v: number }) => u <= STAIRWELL.opening && v >= STAIRWELL.back;
 
   it("samples the whole diamond on the ground, around the stairwell", () => {
     const random = createRandom(4);
@@ -155,15 +155,18 @@ describe("levelPoint", () => {
     expect(points.some(({ y }) => y < -100)).toBe(true);
   });
 
-  it("keeps upper levels on the back half, outside the stair opening", () => {
+  it("keeps upper levels on the quarter-size square at the back", () => {
     const random = createRandom(5);
     for (const level of [1, 2]) {
-      for (let index = 0; index < 1000; index++) {
-        const point = levelPoint(random, config.floor, level);
-        expect(point.y).toBeLessThanOrEqual(0);
-        expect(Math.abs(point.x) / 400 + Math.abs(point.y) / 200).toBeLessThanOrEqual(1 + 1e-9);
-        expect(inOpening(toGrid(config.floor, point))).toBe(false);
+      const grids = Array.from({ length: 1000 }, () => toGrid(config.floor, levelPoint(random, config.floor, level)));
+      for (const { u, v } of grids) {
+        expect(u).toBeGreaterThanOrEqual(-1e-9);
+        expect(v).toBeGreaterThanOrEqual(-1e-9);
+        expect(u).toBeLessThanOrEqual(UPPER_SIZE + 1e-9);
+        expect(v).toBeLessThanOrEqual(UPPER_SIZE + 1e-9);
       }
+      expect(grids.some(({ u, v }) => u > 0.45 && v > 0.45)).toBe(true);
+      expect(grids.some(({ u, v }) => u < 0.05 && v < 0.05)).toBe(true);
     }
   });
 
@@ -176,6 +179,7 @@ describe("levelPoint", () => {
     expect(onLevel(config.floor, 0, at(0.05, 0.6))).toBe(false);
     expect(onLevel(config.floor, 0, at(0.3, 0.6))).toBe(true);
     expect(onLevel(config.floor, 1, at(0.3, 0.6))).toBe(false);
+    expect(onLevel(config.floor, 1, at(0.6, 0.3))).toBe(false);
     expect(onLevel(config.floor, 1, at(0.3, 0.45))).toBe(true);
   });
 });
@@ -185,9 +189,9 @@ describe("pickLevel", () => {
     const random = createRandom(6);
     const counts = Array.from({ length: LEVEL_COUNT }, () => 0);
     for (let index = 0; index < 4000; index++) counts[pickLevel(random)]++;
-    expect(counts[0] / 4000).toBeCloseTo(0.5, 1);
-    expect(counts[1] / 4000).toBeCloseTo(0.25, 1);
-    expect(counts[2] / 4000).toBeCloseTo(0.25, 1);
+    expect(counts[0] / 4000).toBeCloseTo(2 / 3, 1);
+    expect(counts[1] / 4000).toBeCloseTo(1 / 6, 1);
+    expect(counts[2] / 4000).toBeCloseTo(1 / 6, 1);
   });
 });
 
@@ -197,11 +201,6 @@ describe("pathClear", () => {
   it("blocks straight paths through the stairwell on the ground", () => {
     expect(pathClear(config.floor, 0, at(0.05, 0.3), at(0.05, 0.9))).toBe(false);
     expect(pathClear(config.floor, 0, at(0.02, 0.45), at(0.3, 0.65))).toBe(false);
-  });
-
-  it("blocks straight paths across the stair opening upstairs", () => {
-    expect(pathClear(config.floor, 1, at(0.05, 0.3), at(0.5, 0.45))).toBe(true);
-    expect(pathClear(config.floor, 1, at(0.05, 0.45), at(0.45, 0.52))).toBe(false);
   });
 
   it("allows paths beside the stairwell", () => {
@@ -249,10 +248,12 @@ describe("stairBoxes", () => {
     }
   });
 
-  it("is not covered by the slab above on the demo floor", () => {
-    const demoHalfHeight = 240;
-    const shift = FLOOR_HEIGHT / (2 * demoHalfHeight);
-    for (const box of boxes) expect(box.u1 + shift).toBeLessThanOrEqual(STAIRWELL.opening);
+  it("stands in front of the upper slabs' south-west face at their west corner", () => {
+    for (const box of boxes) {
+      expect(box.v0).toBeGreaterThanOrEqual(UPPER_SIZE - 1e-9);
+      expect(box.u0).toBeGreaterThanOrEqual(0);
+      expect(box.u1).toBeLessThan(UPPER_SIZE);
+    }
   });
 });
 
@@ -282,11 +283,11 @@ describe("wanderTarget", () => {
     }
   });
 
-  it("never heads across the stair opening", () => {
+  it("never heads through the stairwell on the ground", () => {
     const random = createRandom(10);
-    const from = toScreen(config.floor, { u: 0.05, v: 0.45 });
+    const from = toScreen(config.floor, { u: 0.05, v: 0.3 });
     for (let index = 0; index < 200; index++) {
-      expect(pathClear(config.floor, 1, from, wanderTarget(random, from, 1, config))).toBe(true);
+      expect(pathClear(config.floor, 0, from, wanderTarget(random, from, 0, config))).toBe(true);
     }
   });
 });
