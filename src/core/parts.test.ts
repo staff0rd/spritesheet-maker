@@ -14,12 +14,12 @@ describe("PART_CATALOG", () => {
     }
   });
 
-  it("draws hair behind the top when facing the camera and over it when facing away", () => {
+  it("draws hair behind the top when facing the camera and over it when facing away or in profile", () => {
     const { drawOrder } = PART_CATALOG;
-    for (const direction of ["SE", "SW"] as const) {
+    for (const direction of ["SE", "S", "SW"] as const) {
       expect(drawOrder[direction].indexOf("hair")).toBeLessThan(drawOrder[direction].indexOf("top"));
     }
-    for (const direction of ["NE", "NW"] as const) {
+    for (const direction of ["N", "NE", "E", "W", "NW"] as const) {
       expect(drawOrder[direction].indexOf("hair")).toBeGreaterThan(drawOrder[direction].indexOf("top"));
     }
   });
@@ -33,7 +33,7 @@ describe("validateCatalog", () => {
       { id: "body", tintGroup: "skin", optional: false, variants: [{ id: "average", kind: "humanoid", params: {} }] },
       { id: "hat", tintGroup: "cloth", optional: true, variants: [{ id: "cap", kind: "baseball-cap", params: {} }] },
     ],
-    drawOrder: { NE: order, SE: order, SW: order, NW: order },
+    drawOrder: { N: order, NE: order, E: order, SE: order, S: order, SW: order, W: order, NW: order },
   };
 
   it.each<[string, PartCatalog]>([

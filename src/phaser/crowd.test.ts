@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PART_CATALOG } from "../core/catalog";
 import { DEFAULT_CAPTURE_CONFIG } from "../core/config";
+import { DIRECTIONS } from "../core/directions";
 import { computeSheetLayout } from "../core/layout";
 import { buildManifest } from "../core/manifest";
 import { createRandom } from "../core/random";
@@ -19,6 +20,7 @@ import {
   MIN_CROWD,
   facingFor,
   flightRoute,
+  headingAngle,
   frameIndex,
   onLevel,
   pathClear,
@@ -110,13 +112,40 @@ describe("diamondPoint", () => {
 });
 
 describe("facingFor", () => {
-  it("snaps screen vectors to the nearest iso direction", () => {
+  const toward = (angle: number) => facingFor(Math.cos(angle), Math.sin(angle));
+  const clockwise = DIRECTIONS.map((direction) => ({ direction, angle: headingAngle(direction) }));
+
+  it("snaps screen vectors to the nearest of 8 headings", () => {
+    expect(facingFor(0, -3)).toBe("N");
     expect(facingFor(2, -1)).toBe("NE");
+    expect(facingFor(5, 0)).toBe("E");
     expect(facingFor(2, 1)).toBe("SE");
+    expect(facingFor(0, 3)).toBe("S");
     expect(facingFor(-2, 1)).toBe("SW");
+    expect(facingFor(-5, 0)).toBe("W");
     expect(facingFor(-2, -1)).toBe("NW");
-    expect(facingFor(0.1, -5)).toBe("NE");
-    expect(facingFor(-5, -0.1)).toBe("NW");
+  });
+
+  it("uses projected iso angles for the diagonals", () => {
+    expect(headingAngle("NE")).toBeCloseTo(-Math.atan(0.5));
+    expect(facingFor(1, -1)).toBe("NE");
+    expect(facingFor(1, -2)).toBe("N");
+    expect(facingFor(-1, 2)).toBe("S");
+    expect(facingFor(4, -1)).toBe("NE");
+    expect(facingFor(8, -1)).toBe("E");
+  });
+
+  it("switches heading midway between neighbours", () => {
+    const epsilon = 1e-6;
+    clockwise.forEach(({ direction, angle }, index) => {
+      const next = clockwise[(index + 1) % clockwise.length];
+      let nextAngle = next.angle;
+      if (nextAngle < angle) nextAngle += 2 * Math.PI;
+      const boundary = (angle + nextAngle) / 2;
+      expect(toward(angle)).toBe(direction);
+      expect(toward(boundary - epsilon)).toBe(direction);
+      expect(toward(boundary + epsilon)).toBe(next.direction);
+    });
   });
 
   it("has no facing for a zero vector", () => {
@@ -254,7 +283,7 @@ describe("stairBoxes", () => {
   });
 
   it("sorts the upper flight and landing between people on the lower flight and people on the landing or upper flight", () => {
-    const [, top, , foot, exit] = flightRoute(config.floor, 0, true);
+    const [, top, , , foot, exit] = flightRoute(config.floor, 0, true);
     const lowerWalker = walkerDepth(config.floor, { y: top.y, z: top.z - 1, level: 0 });
     const landingWalker = walkerDepth(config.floor, { y: top.y, z: top.z, level: 0 });
     const upperWalker = walkerDepth(config.floor, { y: (foot.y + exit.y) / 2, z: 90, level: 1 });
@@ -320,20 +349,20 @@ describe("flightRoute", () => {
 
   it("climbs half a floor to the landing then returns up to the next level", () => {
     const route = flightRoute(config.floor, 1, true);
-    const [entry, , , , exit] = route;
-    expect(route.map(({ z }) => z)).toEqual([120, 180, 180, 180, 240]);
-    expect(route.map(({ level }) => level)).toEqual([1, 1, 1, 2, 2]);
+    const [entry, , , , , exit] = route;
+    expect(route.map(({ z }) => z)).toEqual([120, 180, 180, 180, 180, 240]);
+    expect(route.map(({ level }) => level)).toEqual([1, 1, 1, 1, 2, 2]);
     expect(onLevel(config.floor, 1, entry)).toBe(true);
     expect(onLevel(config.floor, 2, exit)).toBe(true);
-    expect(facings(route)).toEqual(["SW", "SE", "SE", "NE"]);
+    expect(facings(route)).toEqual(["SW", "SW", "SE", "NE", "NE"]);
   });
 
   it("walks the same points back down, dropping a level on reaching the landing", () => {
     const up = flightRoute(config.floor, 0, true);
     const down = flightRoute(config.floor, 0, false);
     expect(down.map(({ x, y, z }) => ({ x, y, z }))).toEqual([...up].reverse().map(({ x, y, z }) => ({ x, y, z })));
-    expect(down.map(({ level }) => level)).toEqual([1, 0, 0, 0, 0]);
-    expect(facings(down)).toEqual(["SW", "NW", "NW", "NE"]);
+    expect(down.map(({ level }) => level)).toEqual([1, 0, 0, 0, 0, 0]);
+    expect(facings(down)).toEqual(["SW", "SW", "NW", "NE", "NE"]);
   });
 
   it("keeps every stair point inside the stairwell", () => {
@@ -512,7 +541,7 @@ describe("stepWander", () => {
   });
 
   it("moves on to the next waypoint without pausing and takes its level", () => {
-    const [, , , foot, exit] = flightRoute(config.floor, 0, true);
+    const [, , , , foot, exit] = flightRoute(config.floor, 0, true);
     const turning: Wanderer = { ...walking, ...foot, level: 0, target: foot, route: [exit] };
     const next = stepWander(turning, 0.1, createRandom(1), config);
     expect(next).toMatchObject({ level: 1, target: exit, route: [], pause: 0 });
