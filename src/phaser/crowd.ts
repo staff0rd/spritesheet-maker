@@ -327,11 +327,51 @@ export function routeTo(
   return [...route, ...detour, { x: to.x, y: to.y, z: levelHeight(level), level }];
 }
 
+const cross = (a: Point, b: Point): number => a.x * b.y - a.y * b.x;
+
+export function headingTurns(from: Point, to: Point): Point[][] {
+  const d = { x: to.x - from.x, y: to.y - from.y };
+  const size = Math.hypot(d.x, d.y);
+  if (size === 0) return [[]];
+  const headings = DIRECTIONS.map((direction) => SCREEN_HEADINGS[direction]);
+  for (let index = 0; index < headings.length; index++) {
+    const first = headings[index];
+    const second = headings[(index + 1) % headings.length];
+    const det = cross(first, second);
+    const a = cross(d, second) / det;
+    const b = cross(first, d) / det;
+    if (a < -1e-9 || b < -1e-9) continue;
+    const tolerance = 1e-9 * size;
+    if (Math.abs(a * Math.hypot(first.x, first.y)) <= tolerance || Math.abs(b * Math.hypot(second.x, second.y)) <= tolerance) {
+      return [[]];
+    }
+    return [
+      [{ x: from.x + a * first.x, y: from.y + a * first.y }],
+      [{ x: from.x + b * second.x, y: from.y + b * second.y }],
+    ];
+  }
+  return [[]];
+}
+
+function snappedLeg(floor: Floor, level: number, from: Point, to: Point): Waypoint[] | undefined {
+  for (const turn of headingTurns(from, to)) {
+    const points = [from, ...turn, to];
+    const clear = points.slice(1).every((point, index) => pathClear(floor, level, points[index], point));
+    if (clear && turn.every((point) => onLevel(floor, level, point))) {
+      return turn.map((point) => ({ ...point, z: levelHeight(level), level }));
+    }
+  }
+  return undefined;
+}
+
 function levelLeg(floor: Floor, level: number, from: Point, to: Point): Waypoint[] | undefined {
-  if (pathClear(floor, level, from, to)) return [];
+  const direct = snappedLeg(floor, level, from, to);
+  if (direct) return direct;
   const corner = toScreen(floor, { u: STAIRWELL.width + STAIR_DOOR, v: STAIRWELL.back - STAIR_DOOR });
-  if (!pathClear(floor, level, from, corner) || !pathClear(floor, level, corner, to)) return undefined;
-  return [{ ...corner, z: levelHeight(level), level }];
+  const toCorner = snappedLeg(floor, level, from, corner);
+  const fromCorner = snappedLeg(floor, level, corner, to);
+  if (!toCorner || !fromCorner) return undefined;
+  return [...toCorner, { ...corner, z: levelHeight(level), level }, ...fromCorner];
 }
 
 export function walkerDepth(floor: Floor, { y, z, level }: Pick<Wanderer, "y" | "z" | "level">): number {
@@ -382,8 +422,11 @@ export function wanderRoute(random: Random, from: Point, fromLevel: number, conf
       if (route) return route;
     }
   }
-  const { x, y } = wanderTarget(random, from, fromLevel, config);
-  return [{ x, y, z: levelHeight(fromLevel), level: fromLevel }];
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const route = routeTo(floor, from, fromLevel, wanderTarget(random, from, fromLevel, config), fromLevel);
+    if (route) return route;
+  }
+  return [{ x: from.x, y: from.y, z: levelHeight(fromLevel), level: fromLevel }];
 }
 
 export function stepWander(wanderer: Wanderer, seconds: number, random: Random, config: WanderConfig): Wanderer {

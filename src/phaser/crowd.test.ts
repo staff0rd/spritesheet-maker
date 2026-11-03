@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PART_CATALOG } from "../core/catalog";
 import { DEFAULT_CAPTURE_CONFIG } from "../core/config";
 import { DIRECTIONS } from "../core/directions";
-import { computeSheetLayout } from "../core/layout";
+import { computeSheetLayout, type Point } from "../core/layout";
 import { buildManifest } from "../core/manifest";
 import { createRandom } from "../core/random";
 import {
@@ -21,6 +21,7 @@ import {
   facingFor,
   flightRoute,
   headingAngle,
+  headingTurns,
   frameIndex,
   onLevel,
   pathClear,
@@ -435,22 +436,21 @@ describe("routeTo", () => {
     expect(routeTo(config.floor, ground, 0, { x: 10, y: 20 }, 0)).toEqual([{ x: 10, y: 20, z: 0, level: 0 }]);
   });
 
+  const contains = (route: Waypoint[], part: Waypoint[]) =>
+    route.some((_, start) => part.every((point, index) => JSON.stringify(route[start + index]) === JSON.stringify(point)));
+
   it("climbs from level 0 to level 2 through both flights", () => {
-    const route = routeTo(config.floor, ground, 0, top, 2);
-    expect(route).toEqual([
-      ...flightRoute(config.floor, 0, true),
-      ...flightRoute(config.floor, 1, true),
-      { ...top, z: 240, level: 2 },
-    ]);
+    const route = routeTo(config.floor, ground, 0, top, 2)!;
+    expect(contains(route, [...flightRoute(config.floor, 0, true), ...flightRoute(config.floor, 1, true)])).toBe(true);
+    expect(route.at(-1)).toEqual({ ...top, z: 240, level: 2 });
+    expectSnapped(ground, route);
   });
 
   it("descends from level 2 to level 0 through both flights", () => {
-    const route = routeTo(config.floor, top, 2, ground, 0);
-    expect(route).toEqual([
-      ...flightRoute(config.floor, 1, false),
-      ...flightRoute(config.floor, 0, false),
-      { ...ground, z: 0, level: 0 },
-    ]);
+    const route = routeTo(config.floor, top, 2, ground, 0)!;
+    expect(contains(route, [...flightRoute(config.floor, 1, false), ...flightRoute(config.floor, 0, false)])).toBe(true);
+    expect(route.at(-1)).toEqual({ ...ground, z: 0, level: 0 });
+    expectSnapped(top, route);
   });
 
   it("climbs one level up and down", () => {
@@ -458,20 +458,55 @@ describe("routeTo", () => {
     expect(routeTo(config.floor, top, 1, ground, 0)?.at(-1)).toEqual({ ...ground, z: 0, level: 0 });
   });
 
-  it("steps around the stairwell's corner on the ground", () => {
-    const front = toScreen(config.floor, { u: 0.8, v: 0.6 });
-    const corner = { ...toScreen(config.floor, { u: STAIRWELL.width + 0.01, v: 0.49 }), z: 0, level: 0 };
-    const [first, second] = routeTo(config.floor, front, 0, top, 1) ?? [];
-    expect(first.x).toBeCloseTo(corner.x);
-    expect(first.y).toBeCloseTo(corner.y);
-    expect(second).toEqual(flightRoute(config.floor, 0, true)[0]);
-    expect(routeTo(config.floor, top, 1, front, 0)?.at(-2)).toEqual(first);
+  it("never crosses the stairwell or a pillar on its way round", () => {
+    const random = createRandom(6);
+    for (let index = 0; index < 300; index++) {
+      const from = levelPoint(random, config.floor, 0);
+      const to = levelPoint(random, config.floor, 1);
+      const route = routeTo(config.floor, from, 0, to, 1);
+      if (!route) continue;
+      expectSnapped(from, route);
+      const ground = [from, ...route.slice(0, route.indexOf(flightRoute(config.floor, 0, true)[0]) + 1)];
+      ground.slice(1).forEach((point, step) => expect(pathClear(config.floor, 0, ground[step], point)).toBe(true));
+    }
   });
 
-  it("gives up when a ground leg would cross the stairwell", () => {
-    const south = toScreen(config.floor, { u: 0.05, v: 0.9 });
-    expect(routeTo(config.floor, south, 0, top, 1)).toBeUndefined();
-    expect(routeTo(config.floor, top, 1, south, 0)).toBeUndefined();
+  it("snaps legs to the 8 headings with a single turn", () => {
+    const from = toScreen(config.floor, { u: 0.8, v: 0.8 });
+    const to = toScreen(config.floor, { u: 0.6, v: 0.9 });
+    const route = routeTo(config.floor, from, 0, to, 0)!;
+    expect(route).toHaveLength(2);
+    expectSnapped(from, route);
+  });
+});
+
+function expectSnapped(from: Point, route: Waypoint[]): void {
+  const points = [from, ...route];
+  points.slice(1).forEach((point, index) => {
+    const dx = point.x - points[index].x;
+    const dy = point.y - points[index].y;
+    if (dx === 0 && dy === 0) return;
+    const facing = facingFor(dx, dy)!;
+    const diff = Math.abs(Math.atan2(dy, dx) - headingAngle(facing)) % (2 * Math.PI);
+    expect(Math.min(diff, 2 * Math.PI - diff)).toBeLessThan(1e-6);
+  });
+}
+
+describe("headingTurns", () => {
+  it("needs no turn along a heading", () => {
+    expect(headingTurns({ x: 0, y: 0 }, { x: 40, y: -20 })).toEqual([[]]);
+    expect(headingTurns({ x: 0, y: 0 }, { x: 0, y: 30 })).toEqual([[]]);
+  });
+
+  it("offers both orders of the two headings either side", () => {
+    const turns = headingTurns({ x: 0, y: 0 }, { x: 30, y: 0 + 5 });
+    expect(turns).toHaveLength(2);
+    for (const [turn] of turns) {
+      expectSnapped({ x: 0, y: 0 }, [
+        { ...turn, z: 0, level: 0 },
+        { x: 30, y: 5, z: 0, level: 0 },
+      ]);
+    }
   });
 });
 
