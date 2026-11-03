@@ -11,16 +11,19 @@ import {
   depthFor,
   diamondPoint,
   FLOOR_HEIGHT,
+  LEVEL_CHANGE_CHANCE,
   LEVEL_COUNT,
   levelHeight,
   levelPoint,
   MAX_CROWD,
   MIN_CROWD,
   facingFor,
+  flightRoute,
   frameIndex,
   onLevel,
   pathClear,
   pickLevel,
+  routeTo,
   sheetColumns,
   slabDepth,
   STAIRWELL,
@@ -31,9 +34,12 @@ import {
   toGrid,
   toScreen,
   UPPER_SIZE,
+  walkerDepth,
+  wanderRoute,
   wanderTarget,
   type WanderConfig,
   type Wanderer,
+  type Waypoint,
 } from "./crowd";
 
 const manifest = buildManifest({
@@ -292,18 +298,157 @@ describe("wanderTarget", () => {
   });
 });
 
-describe("stepWander", () => {
-  const walking: Wanderer = { x: 0, y: 0, level: 0, target: { x: 100, y: 50 }, pause: 0, direction: "NW" };
+describe("flightRoute", () => {
+  const facings = (route: Waypoint[]) =>
+    route.slice(1).map((point, index) => facingFor(point.x - route[index].x, point.y - route[index].y));
 
-  it("keeps the wanderer on its level", () => {
-    const upstairs: Wanderer = { ...walking, y: -100, level: 2, target: { x: 0, y: -100 }, pause: 0.1 };
-    const random = createRandom(2);
-    let next = upstairs;
-    for (let index = 0; index < 500; index++) {
-      next = stepWander(next, 0.5, random, config);
-      expect(next.level).toBe(2);
-      expect(onLevel(config.floor, 2, next)).toBe(true);
+  it("climbs half a floor to the landing then returns up to the next level", () => {
+    const route = flightRoute(config.floor, 1, true);
+    const [entry, , , , exit] = route;
+    expect(route.map(({ z }) => z)).toEqual([120, 180, 180, 180, 240]);
+    expect(route.map(({ level }) => level)).toEqual([1, 1, 1, 2, 2]);
+    expect(onLevel(config.floor, 1, entry)).toBe(true);
+    expect(onLevel(config.floor, 2, exit)).toBe(true);
+    expect(facings(route)).toEqual(["SW", "SW", "NE", "NE"]);
+  });
+
+  it("walks the same points back down, dropping a level on reaching the landing", () => {
+    const up = flightRoute(config.floor, 0, true);
+    const down = flightRoute(config.floor, 0, false);
+    expect(down.map(({ x, y, z }) => ({ x, y, z }))).toEqual([...up].reverse().map(({ x, y, z }) => ({ x, y, z })));
+    expect(down.map(({ level }) => level)).toEqual([1, 0, 0, 0, 0]);
+    expect(facings(down)).toEqual(["SW", "SW", "NE", "NE"]);
+  });
+
+  it("keeps every stair point inside the stairwell", () => {
+    for (const point of flightRoute(config.floor, 0, true).slice(1, -1)) {
+      const { u, v } = toGrid(config.floor, point);
+      expect(u).toBeGreaterThan(0);
+      expect(u).toBeLessThan(STAIRWELL.width);
+      expect(v).toBeGreaterThanOrEqual(STAIRWELL.back);
+      expect(v).toBeLessThanOrEqual(STAIRWELL.front);
     }
+  });
+});
+
+describe("routeTo", () => {
+  const ground = toScreen(config.floor, { u: 0.8, v: 0.3 });
+  const top = toScreen(config.floor, { u: 0.4, v: 0.2 });
+
+  it("ends on the target on the same level without stairs", () => {
+    expect(routeTo(config.floor, ground, 0, { x: 10, y: 20 }, 0)).toEqual([{ x: 10, y: 20, z: 0, level: 0 }]);
+  });
+
+  it("climbs from level 0 to level 2 through both flights", () => {
+    const route = routeTo(config.floor, ground, 0, top, 2);
+    expect(route).toEqual([
+      ...flightRoute(config.floor, 0, true),
+      ...flightRoute(config.floor, 1, true),
+      { ...top, z: 240, level: 2 },
+    ]);
+  });
+
+  it("descends from level 2 to level 0 through both flights", () => {
+    const route = routeTo(config.floor, top, 2, ground, 0);
+    expect(route).toEqual([
+      ...flightRoute(config.floor, 1, false),
+      ...flightRoute(config.floor, 0, false),
+      { ...ground, z: 0, level: 0 },
+    ]);
+  });
+
+  it("climbs one level up and down", () => {
+    expect(routeTo(config.floor, ground, 0, top, 1)?.at(-1)).toEqual({ ...top, z: 120, level: 1 });
+    expect(routeTo(config.floor, top, 1, ground, 0)?.at(-1)).toEqual({ ...ground, z: 0, level: 0 });
+  });
+
+  it("steps around the stairwell's corner on the ground", () => {
+    const front = toScreen(config.floor, { u: 0.8, v: 0.6 });
+    const corner = { ...toScreen(config.floor, { u: 0.13, v: 0.49 }), z: 0, level: 0 };
+    const [first, second] = routeTo(config.floor, front, 0, top, 1) ?? [];
+    expect(first.x).toBeCloseTo(corner.x);
+    expect(first.y).toBeCloseTo(corner.y);
+    expect(second).toEqual(flightRoute(config.floor, 0, true)[0]);
+    expect(routeTo(config.floor, top, 1, front, 0)?.at(-2)).toEqual(first);
+  });
+
+  it("gives up when a ground leg would cross the stairwell", () => {
+    const south = toScreen(config.floor, { u: 0.05, v: 0.9 });
+    expect(routeTo(config.floor, south, 0, top, 1)).toBeUndefined();
+    expect(routeTo(config.floor, top, 1, south, 0)).toBeUndefined();
+  });
+});
+
+describe("wanderRoute", () => {
+  it("sends people to every level and ends on the destination level's walkable area", () => {
+    const random = createRandom(4);
+    const from = toScreen(config.floor, { u: 0.7, v: 0.7 });
+    const routes = Array.from({ length: 2000 }, () => wanderRoute(random, from, 0, config));
+    const ends = routes.map((route) => route[route.length - 1]);
+    expect(new Set(ends.map(({ level }) => level))).toEqual(new Set([0, 1, 2]));
+    const changes = ends.filter(({ level }) => level !== 0).length / ends.length;
+    expect(changes).toBeGreaterThan(LEVEL_CHANGE_CHANCE / 2);
+    expect(changes).toBeLessThan(LEVEL_CHANGE_CHANCE * 1.5);
+    for (const end of ends) {
+      expect(onLevel(config.floor, end.level, end)).toBe(true);
+      expect(end.z).toBe(levelHeight(end.level));
+    }
+  });
+});
+
+describe("walkerDepth", () => {
+  it("sorts flat walkers by level band and y", () => {
+    expect(walkerDepth(config.floor, { y: 30, z: 120, level: 1 })).toBe(depthFor(1, 30));
+  });
+
+  it("draws walkers on the stairs above that band's stairs", () => {
+    const foot = toScreen(config.floor, { u: 0.03, v: 0.5 });
+    expect(walkerDepth(config.floor, { y: foot.y, z: 5, level: 0 })).toBeGreaterThan(stairDepth(config.floor, 0));
+    expect(walkerDepth(config.floor, { y: foot.y, z: 110, level: 1 })).toBeGreaterThan(stairDepth(config.floor, 1));
+    expect(walkerDepth(config.floor, { y: foot.y, z: 110, level: 1 })).toBeLessThan(slabDepth(2));
+  });
+});
+
+describe("stepWander", () => {
+  const target = { x: 100, y: 50, z: 0, level: 0 };
+  const walking: Wanderer = { x: 0, y: 0, z: 0, level: 0, target, route: [], pause: 0, direction: "NW" };
+
+  it("keeps people on a level's walkable area or inside the stairwell", () => {
+    const random = createRandom(2);
+    const levels = new Set<number>();
+    let next: Wanderer = { ...walking, pause: 0.1 };
+    for (let index = 0; index < 20_000; index++) {
+      next = stepWander(next, 0.1, random, config);
+      levels.add(next.level);
+      expect(next.z).toBeGreaterThanOrEqual(levelHeight(next.level) - FLOOR_HEIGHT);
+      expect(next.z).toBeLessThanOrEqual(levelHeight(next.level) + FLOOR_HEIGHT);
+      if (next.z === levelHeight(next.level)) {
+        expect(onLevel(config.floor, next.level, next)).toBe(true);
+      } else {
+        const { u, v } = toGrid(config.floor, next);
+        expect(u).toBeLessThanOrEqual(STAIRWELL.width);
+        expect(v).toBeGreaterThanOrEqual(STAIRWELL.back - 0.01 - 1e-9);
+        expect(v).toBeLessThanOrEqual(STAIRWELL.front);
+      }
+    }
+    expect(levels).toEqual(new Set([0, 1, 2]));
+  });
+
+  it("raises the walker along a flight and faces the climb", () => {
+    const [entry, landing] = flightRoute(config.floor, 0, true);
+    const climbing: Wanderer = { ...walking, ...entry, target: landing, route: [] };
+    const seconds = Math.hypot(landing.x - entry.x, landing.y - entry.y) / config.speed / 2;
+    const next = stepWander(climbing, seconds, createRandom(1), config);
+    expect(next.z).toBeCloseTo(FLOOR_HEIGHT / 4);
+    expect(next.x).toBeCloseTo((entry.x + landing.x) / 2);
+    expect(next.direction).toBe("SW");
+  });
+
+  it("moves on to the next waypoint without pausing and takes its level", () => {
+    const [, , , foot, exit] = flightRoute(config.floor, 0, true);
+    const turning: Wanderer = { ...walking, ...foot, level: 0, target: foot, route: [exit] };
+    const next = stepWander(turning, 0.1, createRandom(1), config);
+    expect(next).toMatchObject({ level: 1, target: exit, route: [], pause: 0 });
   });
 
 
@@ -328,7 +473,8 @@ describe("stepWander", () => {
 
     const resumed = stepWander(paused, 2, createRandom(1), config);
     expect(resumed.pause).toBe(0);
-    expect(resumed.target).toEqual(wanderTarget(createRandom(1), paused, 0, config));
+    const [target, ...route] = wanderRoute(createRandom(1), paused, 0, config);
+    expect(resumed).toMatchObject({ target, route });
     expect(resumed.direction).toBe(facingFor(resumed.target.x, resumed.target.y));
     expect(resumed).toMatchObject({ x: 0, y: 0 });
   });

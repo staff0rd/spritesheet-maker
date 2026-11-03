@@ -173,6 +173,72 @@ export function stairDepth(floor: Floor, level: number): number {
   return depthFor(level, toScreen(floor, { u: STAIRWELL.width, v: STAIRWELL.back }).y);
 }
 
+export interface Waypoint extends Point {
+  z: number;
+  level: number;
+}
+
+const STAIR_DOOR = 0.01;
+export const LEVEL_CHANGE_CHANCE = 0.05;
+
+export function flightRoute(floor: Floor, level: number, up: boolean): Waypoint[] {
+  const { width, back, turn, front } = STAIRWELL;
+  const door = back - STAIR_DOOR;
+  const base = levelHeight(level);
+  const landing = base + FLOOR_HEIGHT / 2;
+  const points: [GridPoint, number, number, number][] = [
+    [{ u: width / 4, v: door }, base, level, level],
+    [{ u: width / 4, v: turn }, landing, level, level],
+    [{ u: width / 2, v: (turn + front) / 2 }, landing, level, level],
+    [{ u: (3 * width) / 4, v: turn }, landing, level + 1, level],
+    [{ u: (3 * width) / 4, v: door }, base + FLOOR_HEIGHT, level + 1, level + 1],
+  ];
+  const ordered = up ? points : [...points].reverse();
+  return ordered.map(([grid, z, upLevel, downLevel]) => ({
+    ...toScreen(floor, grid),
+    z,
+    level: up ? upLevel : downLevel,
+  }));
+}
+
+export function routeTo(
+  floor: Floor,
+  from: Point,
+  fromLevel: number,
+  to: Point,
+  toLevel: number,
+): Waypoint[] | undefined {
+  const route: Waypoint[] = [];
+  let at: Point = from;
+  let level = fromLevel;
+  while (level !== toLevel) {
+    const up = toLevel > level;
+    const flight = flightRoute(floor, up ? level : level - 1, up);
+    const detour = levelLeg(floor, level, at, flight[0]);
+    if (!detour) return undefined;
+    route.push(...detour, ...flight);
+    const exit = flight[flight.length - 1];
+    at = exit;
+    level = exit.level;
+  }
+  const detour = levelLeg(floor, level, at, to);
+  if (!detour) return undefined;
+  return [...route, ...detour, { x: to.x, y: to.y, z: levelHeight(level), level }];
+}
+
+function levelLeg(floor: Floor, level: number, from: Point, to: Point): Waypoint[] | undefined {
+  if (pathClear(floor, level, from, to)) return [];
+  const corner = toScreen(floor, { u: STAIRWELL.width + STAIR_DOOR, v: STAIRWELL.back - STAIR_DOOR });
+  if (!pathClear(floor, level, from, corner) || !pathClear(floor, level, corner, to)) return undefined;
+  return [{ ...corner, z: levelHeight(level), level }];
+}
+
+export function walkerDepth(floor: Floor, { y, z, level }: Pick<Wanderer, "y" | "z" | "level">): number {
+  const depth = depthFor(level, y);
+  if (z === levelHeight(level)) return depth;
+  return Math.max(depth, stairDepth(floor, level) + 1);
+}
+
 export interface WanderConfig {
   floor: Floor;
   speed: number;
@@ -184,8 +250,10 @@ export interface WanderConfig {
 export interface Wanderer {
   x: number;
   y: number;
+  z: number;
   level: number;
-  target: Point;
+  target: Waypoint;
+  route: Waypoint[];
   pause: number;
   direction: Direction;
 }
@@ -202,23 +270,46 @@ export function wanderTarget(random: Random, from: Point, level: number, config:
   return fallback;
 }
 
+export function wanderRoute(random: Random, from: Point, fromLevel: number, config: WanderConfig): Waypoint[] {
+  const { floor } = config;
+  if (random() < LEVEL_CHANGE_CHANCE) {
+    const level = (fromLevel + 1 + Math.floor(random() * (LEVEL_COUNT - 1))) % LEVEL_COUNT;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const route = routeTo(floor, from, fromLevel, levelPoint(random, floor, level), level);
+      if (route) return route;
+    }
+  }
+  const { x, y } = wanderTarget(random, from, fromLevel, config);
+  return [{ x, y, z: levelHeight(fromLevel), level: fromLevel }];
+}
+
 export function stepWander(wanderer: Wanderer, seconds: number, random: Random, config: WanderConfig): Wanderer {
   if (wanderer.pause > 0) {
     const pause = wanderer.pause - seconds;
     if (pause > 0) return { ...wanderer, pause };
-    const target = wanderTarget(random, wanderer, wanderer.level, config);
+    const [target, ...route] = wanderRoute(random, wanderer, wanderer.level, config);
     const direction = facingFor(target.x - wanderer.x, target.y - wanderer.y) ?? wanderer.direction;
-    return { ...wanderer, pause: 0, target, direction };
+    return { ...wanderer, pause: 0, target, route, direction };
   }
 
-  const dx = wanderer.target.x - wanderer.x;
-  const dy = wanderer.target.y - wanderer.y;
+  const { target } = wanderer;
+  const dx = target.x - wanderer.x;
+  const dy = target.y - wanderer.y;
   const distance = Math.hypot(dx, dy);
   const step = config.speed * seconds;
   const direction = facingFor(dx, dy) ?? wanderer.direction;
   if (step >= distance) {
-    const pause = config.minPause + random() * (config.maxPause - config.minPause);
-    return { ...wanderer, x: wanderer.target.x, y: wanderer.target.y, pause, direction };
+    const arrived = { ...wanderer, x: target.x, y: target.y, z: target.z, level: target.level, direction };
+    const [next, ...route] = wanderer.route;
+    if (next) return { ...arrived, target: next, route };
+    return { ...arrived, pause: config.minPause + random() * (config.maxPause - config.minPause) };
   }
-  return { ...wanderer, x: wanderer.x + (dx / distance) * step, y: wanderer.y + (dy / distance) * step, direction };
+  const t = step / distance;
+  return {
+    ...wanderer,
+    x: wanderer.x + dx * t,
+    y: wanderer.y + dy * t,
+    z: wanderer.z + (target.z - wanderer.z) * t,
+    direction,
+  };
 }

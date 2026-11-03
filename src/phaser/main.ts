@@ -7,7 +7,6 @@ import type { Point } from "../core/layout";
 import {
   animationFrame,
   crowdSize,
-  depthFor,
   FLOOR_HEIGHT,
   frameIndex,
   LEVEL_COUNT,
@@ -21,6 +20,7 @@ import {
   stepWander,
   tintColor,
   toScreen,
+  walkerDepth,
   type GridPoint,
   type WanderConfig,
   type Wanderer,
@@ -85,8 +85,8 @@ function fill(graphics: Phaser.GameObjects.Graphics, color: number, points: Poin
   );
 }
 
-function place(container: Phaser.GameObjects.Container, { x, y, level }: Wanderer): void {
-  container.setPosition(x, y - levelHeight(level)).setDepth(depthFor(level, y));
+function place(container: Phaser.GameObjects.Container, wanderer: Wanderer): void {
+  container.setPosition(wanderer.x, wanderer.y - wanderer.z).setDepth(walkerDepth(WANDER.floor, wanderer));
 }
 
 function planCrowd(manifest: Manifest, seed: number, size: number): CrowdMember[] {
@@ -99,7 +99,17 @@ function planCrowd(manifest: Manifest, seed: number, size: number): CrowdMember[
     const level = pickLevel(placement);
     const { x, y } = levelPoint(placement, WANDER.floor, level);
     const wander = createRandom(hashString(`wander:${seed}:${index}`));
-    const wanderer: Wanderer = { x, y, level, target: { x, y }, pause: wander() * WANDER.maxPause, direction };
+    const z = levelHeight(level);
+    const wanderer: Wanderer = {
+      x,
+      y,
+      z,
+      level,
+      target: { x, y, z, level },
+      route: [],
+      pause: wander() * WANDER.maxPause,
+      direction,
+    };
     return { character, layers: layersFor(manifest, character, direction), wanderer, random: wander, phase };
   });
 }
