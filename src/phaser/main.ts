@@ -25,6 +25,8 @@ import {
   walkerDepth,
   type GridPoint,
   type RailPoint,
+  type StairBox,
+  upperFlightDepth,
   type WanderConfig,
   type Wanderer,
 } from "./crowd";
@@ -221,10 +223,22 @@ class CrowdScene extends Phaser.Scene {
   }
 
   private drawStairs(level: number, at: (point: GridPoint, z: number) => Point): void {
-    const stairs = this.add.graphics().setDepth(stairDepth(WANDER.floor, level));
+    const lowerFlight = this.add.graphics().setDepth(stairDepth(WANDER.floor, level));
+    const upperFlight = this.add.graphics().setDepth(upperFlightDepth(WANDER.floor, level));
     const { back, front } = stairRails(level);
-    this.drawRail(stairs, back, at);
-    for (const { u0, u1, v0, v1, bottom, top } of stairBoxes(level)) {
+    const { lower, upper } = stairBoxes(level);
+    this.drawRail(lowerFlight, back, at);
+    this.drawSteps(lowerFlight, lower, at);
+    this.drawSteps(upperFlight, upper, at);
+    this.drawRail(this.add.graphics().setDepth(frontRailDepth(WANDER.floor, level)), front, at);
+  }
+
+  private drawSteps(
+    stairs: Phaser.GameObjects.Graphics,
+    boxes: StairBox[],
+    at: (point: GridPoint, z: number) => Point,
+  ): void {
+    for (const { u0, u1, v0, v1, bottom, top } of boxes) {
       fill(stairs, COLORS.stairTop, [
         at({ u: u0, v: v0 }, top),
         at({ u: u1, v: v0 }, top),
@@ -244,8 +258,6 @@ class CrowdScene extends Phaser.Scene {
         at({ u: u1, v: v0 }, bottom),
       ]);
     }
-
-    this.drawRail(this.add.graphics().setDepth(frontRailDepth(WANDER.floor, level)), front, at);
   }
 
   private drawRail(

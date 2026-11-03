@@ -145,28 +145,36 @@ export interface StairBox {
   top: number;
 }
 
-export function stairBoxes(level: number): StairBox[] {
+export function stairBoxes(level: number): { lower: StairBox[]; upper: StairBox[] } {
   const { width, back, turn, front } = STAIRWELL;
   const base = levelHeight(level);
   const half = FLOOR_HEIGHT / 2;
   const rise = half / (STEPS_PER_FLIGHT + 1);
   const run = (turn - back) / STEPS_PER_FLIGHT;
-  const box = (u0: number, u1: number, v0: number, top: number, length: number): StairBox => ({
+  const box = (u0: number, u1: number, v0: number, top: number, length: number, floor: number): StairBox => ({
     u0,
     u1,
     v0,
     v1: v0 + length,
-    bottom: Math.max(base, top - 2 * rise),
+    bottom: Math.max(floor, top - 2 * rise),
     top,
   });
   const steps = Array.from({ length: STEPS_PER_FLIGHT }, (_, index) => index);
-  return [
-    ...steps.map((index) => box(0, width / 2, back + index * run, base + (index + 1) * rise, run)),
-    ...[...steps]
+  return {
+    lower: [
+      ...steps.map((index) => box(0, width / 2, back + index * run, base + (index + 1) * rise, run, base)),
+      box(0, width, turn, base + half, front - turn, base),
+    ],
+    upper: [...steps]
       .reverse()
-      .map((index) => box(width / 2, width, turn - (index + 1) * run, base + half + (index + 1) * rise, run)),
-    box(0, width, turn, base + half, front - turn),
-  ];
+      .map((index) =>
+        box(width / 2, width, turn - (index + 1) * run, base + half + (index + 1) * rise, run, base + half),
+      ),
+  };
+}
+
+export function upperFlightDepth(floor: Floor, level: number): number {
+  return stairDepth(floor, level) + 2;
 }
 
 export interface RailPoint extends GridPoint {

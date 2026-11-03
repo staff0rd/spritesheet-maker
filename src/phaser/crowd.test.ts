@@ -36,6 +36,7 @@ import {
   toGrid,
   toScreen,
   UPPER_SIZE,
+  upperFlightDepth,
   walkerDepth,
   wanderRoute,
   wanderTarget,
@@ -218,11 +219,10 @@ describe("pathClear", () => {
 });
 
 describe("stairBoxes", () => {
-  const boxes = stairBoxes(1);
-  const landing = boxes.at(-1)!;
-  const steps = boxes.slice(0, -1);
-  const up = steps.slice(0, steps.length / 2);
-  const back = steps.slice(steps.length / 2);
+  const { lower, upper: back } = stairBoxes(1);
+  const boxes = [...lower, ...back];
+  const landing = lower.at(-1)!;
+  const up = lower.slice(0, -1);
 
   it("puts a half-floor landing at the front of the stairwell", () => {
     expect(landing).toMatchObject({ u0: 0, u1: STAIRWELL.width, v0: STAIRWELL.turn, v1: STAIRWELL.front });
@@ -248,6 +248,16 @@ describe("stairBoxes", () => {
     expect(tops[0]).toBeGreaterThan(landing.top);
     expect(tops.at(-1)!).toBeLessThan(levelHeight(2));
     for (const step of back) expect(step.u0).toBeCloseTo(STAIRWELL.width / 2);
+    for (const step of back) expect(step.bottom).toBeGreaterThanOrEqual(landing.top);
+  });
+
+  it("sorts the upper flight between people on the lower flight and people on the upper flight", () => {
+    const [, top, , foot, exit] = flightRoute(config.floor, 0, true);
+    const lowerWalker = walkerDepth(config.floor, { y: top.y, z: top.z - 1, level: 0 });
+    const upperWalker = walkerDepth(config.floor, { y: (foot.y + exit.y) / 2, z: 90, level: 1 });
+    expect(upperFlightDepth(config.floor, 0)).toBeGreaterThan(lowerWalker);
+    expect(upperFlightDepth(config.floor, 0)).toBeLessThan(upperWalker);
+    expect(upperFlightDepth(config.floor, 0)).toBeLessThan(slabDepth(1));
   });
 
   it("orders boxes back to front for painting", () => {
