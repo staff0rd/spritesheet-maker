@@ -29,6 +29,7 @@ import {
   STAIRWELL,
   stairBoxes,
   stairDepth,
+  stairRail,
   stepWander,
   tintColor,
   toGrid,
@@ -328,6 +329,16 @@ describe("flightRoute", () => {
       expect(v).toBeGreaterThanOrEqual(STAIRWELL.back);
       expect(v).toBeLessThanOrEqual(STAIRWELL.front);
     }
+  });
+});
+
+describe("stairRail", () => {
+  it("runs up the outer edge of both flights and around the landing", () => {
+    const rail = stairRail(1);
+    expect(rail[0]).toEqual({ u: 0, v: STAIRWELL.back, z: 120 });
+    expect(rail.at(-1)).toEqual({ u: STAIRWELL.width, v: STAIRWELL.back, z: 240 });
+    expect(rail.slice(1, -1).every(({ z }) => z === 180)).toBe(true);
+    expect(Math.max(...rail.map(({ v }) => v))).toBe(STAIRWELL.front);
   });
 });
 

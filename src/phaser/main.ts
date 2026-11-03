@@ -17,6 +17,7 @@ import {
   slabDepth,
   stairBoxes,
   stairDepth,
+  stairRail,
   stepWander,
   tintColor,
   toScreen,
@@ -41,7 +42,10 @@ const COLORS = {
   stairTop: 0x9a8a72,
   stairFront: 0x7a6a56,
   stairSide: 0x62553f,
+  rail: 0xc9c2b4,
 };
+const RAIL_HEIGHT = 18;
+const RAIL_POST_SPACING = 0.04;
 
 interface Walker {
   character: Character;
@@ -236,6 +240,21 @@ class CrowdScene extends Phaser.Scene {
         at({ u: u1, v: v0 }, bottom),
       ]);
     }
+
+    const rail = stairRail(level);
+    stairs.lineStyle(2, COLORS.rail);
+    rail.slice(1).forEach((to, index) => {
+      const from = rail[index];
+      const steps = Math.max(1, Math.round(Math.hypot(to.u - from.u, to.v - from.v) / RAIL_POST_SPACING));
+      const top = (t: number): Point =>
+        at({ u: from.u + (to.u - from.u) * t, v: from.v + (to.v - from.v) * t }, from.z + (to.z - from.z) * t + RAIL_HEIGHT);
+      stairs.lineBetween(top(0).x, top(0).y, top(1).x, top(1).y);
+      for (let post = 0; post <= steps; post++) {
+        const t = post / steps;
+        const foot = at({ u: from.u + (to.u - from.u) * t, v: from.v + (to.v - from.v) * t }, from.z + (to.z - from.z) * t);
+        stairs.lineBetween(foot.x, foot.y, top(t).x, top(t).y);
+      }
+    });
   }
 
   update(_time: number, delta: number): void {
