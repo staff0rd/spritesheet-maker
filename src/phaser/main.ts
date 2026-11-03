@@ -230,11 +230,12 @@ class CrowdScene extends Phaser.Scene {
   private drawStairs(level: number, at: (point: GridPoint, z: number) => Point): void {
     const lowerFlight = this.add.graphics().setDepth(stairDepth(WANDER.floor, level));
     const upperFlight = this.add.graphics().setDepth(upperFlightDepth(WANDER.floor, level));
-    const { back, front } = stairRails(level);
+    const { back, inner, front } = stairRails(level);
     const { lower, upper } = stairBoxes(level);
     this.drawRail(lowerFlight, back, at);
     this.drawSteps(lowerFlight, lower, at);
     this.drawSteps(upperFlight, upper, at);
+    this.drawRail(upperFlight, inner, at);
     this.drawRail(this.add.graphics().setDepth(frontRailDepth(WANDER.floor, level)), front, at);
   }
 

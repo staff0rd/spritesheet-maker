@@ -220,12 +220,16 @@ export interface RailPoint extends GridPoint {
   z: number;
 }
 
-export function stairRails(level: number): { back: RailPoint[]; front: RailPoint[] } {
+export function stairRails(level: number): { back: RailPoint[]; inner: RailPoint[]; front: RailPoint[] } {
   const { width, back, turn, front } = STAIRWELL;
   const base = levelHeight(level);
   const landing = base + FLOOR_HEIGHT / 2;
   const corner = { u: 0, v: front, z: landing };
   return {
+    inner: [
+      { u: width / 2, v: turn, z: landing },
+      { u: width / 2, v: back, z: base + FLOOR_HEIGHT },
+    ],
     back: [{ u: 0, v: back, z: base }, { u: 0, v: turn, z: landing }, corner],
     front: [
       corner,

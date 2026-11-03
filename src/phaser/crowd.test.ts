@@ -383,6 +383,13 @@ describe("stairRail", () => {
     expect([...back.slice(1), ...front.slice(0, -1)].every(({ z }) => z === 180)).toBe(true);
   });
 
+  it("runs up the inner edge of the upper flight from the landing to the next level", () => {
+    expect(stairRails(1).inner).toEqual([
+      { u: STAIRWELL.width / 2, v: STAIRWELL.turn, z: 180 },
+      { u: STAIRWELL.width / 2, v: STAIRWELL.back, z: 240 },
+    ]);
+  });
+
   it("draws the landing's front rail over people on that level's stairs but under the next slab's walkers", () => {
     const foot = toScreen(config.floor, { u: 0.1, v: 0.66 });
     expect(frontRailDepth(config.floor, 0)).toBeGreaterThan(walkerDepth(config.floor, { y: foot.y, z: 60, level: 0 }));
