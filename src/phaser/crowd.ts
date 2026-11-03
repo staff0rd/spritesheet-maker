@@ -55,7 +55,7 @@ export interface Floor {
 export const LEVEL_COUNT = 3;
 export const FLOOR_HEIGHT = 120;
 const LEVEL_DEPTH = 10_000;
-const STEPS_PER_FLIGHT = 6;
+const STEPS_PER_FLIGHT = 12;
 
 export interface GridPoint {
   u: number;
@@ -64,7 +64,7 @@ export interface GridPoint {
 
 export const UPPER_SIZE = 0.5;
 
-export const STAIRWELL = { width: 0.12, back: UPPER_SIZE, turn: 0.72, front: 0.8 } as const;
+export const STAIRWELL = { width: 0.2, back: UPPER_SIZE, turn: 0.63, front: 0.7 } as const;
 
 export const SLAB_OUTLINE: readonly GridPoint[] = [
   { u: 0, v: 0 },

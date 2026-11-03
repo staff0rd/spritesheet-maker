@@ -309,7 +309,7 @@ describe("flightRoute", () => {
     expect(route.map(({ level }) => level)).toEqual([1, 1, 1, 2, 2]);
     expect(onLevel(config.floor, 1, entry)).toBe(true);
     expect(onLevel(config.floor, 2, exit)).toBe(true);
-    expect(facings(route)).toEqual(["SW", "SW", "NE", "NE"]);
+    expect(facings(route)).toEqual(["SW", "SE", "SE", "NE"]);
   });
 
   it("walks the same points back down, dropping a level on reaching the landing", () => {
@@ -317,7 +317,7 @@ describe("flightRoute", () => {
     const down = flightRoute(config.floor, 0, false);
     expect(down.map(({ x, y, z }) => ({ x, y, z }))).toEqual([...up].reverse().map(({ x, y, z }) => ({ x, y, z })));
     expect(down.map(({ level }) => level)).toEqual([1, 0, 0, 0, 0]);
-    expect(facings(down)).toEqual(["SW", "SW", "NE", "NE"]);
+    expect(facings(down)).toEqual(["SW", "NW", "NW", "NE"]);
   });
 
   it("keeps every stair point inside the stairwell", () => {
@@ -364,7 +364,7 @@ describe("routeTo", () => {
 
   it("steps around the stairwell's corner on the ground", () => {
     const front = toScreen(config.floor, { u: 0.8, v: 0.6 });
-    const corner = { ...toScreen(config.floor, { u: 0.13, v: 0.49 }), z: 0, level: 0 };
+    const corner = { ...toScreen(config.floor, { u: STAIRWELL.width + 0.01, v: 0.49 }), z: 0, level: 0 };
     const [first, second] = routeTo(config.floor, front, 0, top, 1) ?? [];
     expect(first.x).toBeCloseTo(corner.x);
     expect(first.y).toBeCloseTo(corner.y);
