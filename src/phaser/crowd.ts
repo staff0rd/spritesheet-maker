@@ -227,7 +227,12 @@ export function stairRails(level: number): { back: RailPoint[]; front: RailPoint
   const corner = { u: 0, v: front, z: landing };
   return {
     back: [{ u: 0, v: back, z: base }, { u: 0, v: turn, z: landing }, corner],
-    front: [corner, { u: width, v: front, z: landing }, { u: width, v: turn, z: landing }],
+    front: [
+      corner,
+      { u: width, v: front, z: landing },
+      { u: width, v: turn, z: landing },
+      { u: width, v: back, z: base + FLOOR_HEIGHT },
+    ],
   };
 }
 

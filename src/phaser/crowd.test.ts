@@ -375,12 +375,12 @@ describe("pillars", () => {
 });
 
 describe("stairRail", () => {
-  it("runs up the back flight's outer edge and around the landing, leaving the front flight open", () => {
+  it("runs up the outer edge of both flights and around the landing", () => {
     const { back, front } = stairRails(1);
     expect(back[0]).toEqual({ u: 0, v: STAIRWELL.back, z: 120 });
     expect(back.at(-1)).toEqual(front[0]);
-    expect(front.at(-1)).toEqual({ u: STAIRWELL.width, v: STAIRWELL.turn, z: 180 });
-    expect([...back.slice(1), ...front].every(({ z }) => z === 180)).toBe(true);
+    expect(front.at(-1)).toEqual({ u: STAIRWELL.width, v: STAIRWELL.back, z: 240 });
+    expect([...back.slice(1), ...front.slice(0, -1)].every(({ z }) => z === 180)).toBe(true);
   });
 
   it("draws the landing's front rail over people on that level's stairs but under the next slab's walkers", () => {
