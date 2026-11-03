@@ -222,6 +222,8 @@ class CrowdScene extends Phaser.Scene {
 
   private drawStairs(level: number, at: (point: GridPoint, z: number) => Point): void {
     const stairs = this.add.graphics().setDepth(stairDepth(WANDER.floor, level));
+    const { back, front } = stairRails(level);
+    this.drawRail(stairs, back, at);
     for (const { u0, u1, v0, v1, bottom, top } of stairBoxes(level)) {
       fill(stairs, COLORS.stairTop, [
         at({ u: u0, v: v0 }, top),
@@ -243,8 +245,6 @@ class CrowdScene extends Phaser.Scene {
       ]);
     }
 
-    const { back, front } = stairRails(level);
-    this.drawRail(stairs, back, at);
     this.drawRail(this.add.graphics().setDepth(frontRailDepth(WANDER.floor, level)), front, at);
   }
 
