@@ -3,13 +3,26 @@ import { layersFor, pickCharacter, type Character, type Layer } from "../core/co
 import type { Direction } from "../core/directions";
 import type { Manifest } from "../core/manifest";
 import { createRandom, hashString, type Random } from "../core/random";
+import type { Point } from "../core/layout";
 import {
   animationFrame,
   crowdSize,
-  diamondPoint,
+  depthFor,
+  FLOOR_HEIGHT,
   frameIndex,
+  LEVEL_COUNT,
+  levelHeight,
+  levelPoint,
+  pickLevel,
+  SLAB_OUTLINE,
+  slabDepth,
+  STAIRWELL,
+  stairBoxes,
+  stairDepth,
   stepWander,
   tintColor,
+  toScreen,
+  type GridPoint,
   type WanderConfig,
   type Wanderer,
 } from "./crowd";
@@ -21,6 +34,14 @@ const WANDER: WanderConfig = {
   minPause: 0.8,
   maxPause: 4,
   minLeg: 80,
+};
+const SLAB_THICKNESS = 12;
+const COLORS = {
+  levels: [0x5b6b4f, 0x6f7f8c, 0x7c6f8c],
+  edges: [0x3f4a37, 0x4c5863, 0x564c63],
+  stairTop: 0x9a8a72,
+  stairFront: 0x7a6a56,
+  stairSide: 0x62553f,
 };
 
 interface Walker {
@@ -57,17 +78,29 @@ const reseedButton = element<HTMLButtonElement>("reseed");
 const countInput = element<HTMLInputElement>("count");
 const countLabel = element<HTMLOutputElement>("count-label");
 
+function fill(graphics: Phaser.GameObjects.Graphics, color: number, points: Point[]): void {
+  graphics.fillStyle(color);
+  graphics.fillPoints(
+    points.map(({ x, y }) => new Phaser.Math.Vector2(x, y)),
+    true,
+  );
+}
+
+function place(container: Phaser.GameObjects.Container, { x, y, level }: Wanderer): void {
+  container.setPosition(x, y - levelHeight(level)).setDepth(depthFor(level, y));
+}
+
 function planCrowd(manifest: Manifest, seed: number, size: number): CrowdMember[] {
   const random = createRandom(seed);
   const placement = createRandom(hashString(`floor:${seed}`));
-  const { halfWidth, halfHeight } = WANDER.floor;
   return Array.from({ length: size }, (_, index) => {
     const character = pickCharacter(manifest, random);
     const direction = manifest.directions[Math.floor(random() * manifest.directions.length)];
     const phase = random();
-    const { x, y } = diamondPoint(placement, halfWidth, halfHeight);
+    const level = pickLevel(placement);
+    const { x, y } = levelPoint(placement, WANDER.floor, level);
     const wander = createRandom(hashString(`wander:${seed}:${index}`));
-    const wanderer: Wanderer = { x, y, target: { x, y }, pause: wander() * WANDER.maxPause, direction };
+    const wanderer: Wanderer = { x, y, level, target: { x, y }, pause: wander() * WANDER.maxPause, direction };
     return { character, layers: layersFor(manifest, character, direction), wanderer, random: wander, phase };
   });
 }
@@ -103,15 +136,7 @@ class CrowdScene extends Phaser.Scene {
   create(): void {
     const { manifest } = this;
     const { anchor, frameSize } = manifest;
-    const floor = this.add.graphics().setDepth(-Infinity);
-    const { halfWidth, halfHeight } = WANDER.floor;
-    floor.fillStyle(0x5b6b4f);
-    floor.fillPoints([
-      new Phaser.Math.Vector2(0, -halfHeight),
-      new Phaser.Math.Vector2(halfWidth, 0),
-      new Phaser.Math.Vector2(0, halfHeight),
-      new Phaser.Math.Vector2(-halfWidth, 0),
-    ]);
+    this.drawLevels();
 
     this.walkers = this.crowd.map(({ character, layers, wanderer, random, phase }) => {
       const sprites = new Map(
@@ -123,7 +148,8 @@ class CrowdScene extends Phaser.Scene {
             .setTint(tintColor(layer.tint)),
         ]),
       );
-      const container = this.add.container(wanderer.x, wanderer.y, [...sprites.values()]).setDepth(wanderer.y);
+      const container = this.add.container(0, 0, [...sprites.values()]);
+      place(container, wanderer);
       return {
         character,
         container,
@@ -138,10 +164,72 @@ class CrowdScene extends Phaser.Scene {
       };
     });
 
-    const centre = () => this.cameras.main.centerOn(0, 0);
+    const centre = () => this.cameras.main.centerOn(0, (-FLOOR_HEIGHT * (LEVEL_COUNT - 1)) / 2);
     centre();
     this.scale.on(Phaser.Scale.Events.RESIZE, centre);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, centre));
+  }
+
+  private drawLevels(): void {
+    const { floor } = WANDER;
+    const at = (point: GridPoint, z: number) => toScreen(floor, point, z);
+    const { back, opening } = STAIRWELL;
+    const east = { u: 1, v: 0 };
+    const edges = [
+      [{ u: opening, v: 1 - opening }, east],
+      [
+        { u: 0, v: back },
+        { u: opening, v: back },
+      ],
+    ];
+
+    const ground = this.add.graphics().setDepth(-Infinity);
+    fill(ground, COLORS.levels[0], [at({ u: 0, v: 0 }, 0), at(east, 0), at({ u: 1, v: 1 }, 0), at({ u: 0, v: 1 }, 0)]);
+
+    for (let level = 0; level < LEVEL_COUNT; level++) {
+      if (level > 0) {
+        const z = levelHeight(level);
+        const slab = this.add.graphics().setDepth(slabDepth(level));
+        fill(
+          slab,
+          COLORS.levels[level],
+          SLAB_OUTLINE.map((point) => at(point, z)),
+        );
+        for (const [from, to] of edges) {
+          fill(slab, COLORS.edges[level], [
+            at(from, z),
+            at(to, z),
+            at(to, z - SLAB_THICKNESS),
+            at(from, z - SLAB_THICKNESS),
+          ]);
+        }
+      }
+      if (level < LEVEL_COUNT - 1) this.drawStairs(level, at);
+    }
+  }
+
+  private drawStairs(level: number, at: (point: GridPoint, z: number) => Point): void {
+    const stairs = this.add.graphics().setDepth(stairDepth(WANDER.floor, level));
+    for (const { u0, u1, v0, v1, bottom, top } of stairBoxes(level)) {
+      fill(stairs, COLORS.stairTop, [
+        at({ u: u0, v: v0 }, top),
+        at({ u: u1, v: v0 }, top),
+        at({ u: u1, v: v1 }, top),
+        at({ u: u0, v: v1 }, top),
+      ]);
+      fill(stairs, COLORS.stairFront, [
+        at({ u: u0, v: v1 }, top),
+        at({ u: u1, v: v1 }, top),
+        at({ u: u1, v: v1 }, bottom),
+        at({ u: u0, v: v1 }, bottom),
+      ]);
+      fill(stairs, COLORS.stairSide, [
+        at({ u: u1, v: v0 }, top),
+        at({ u: u1, v: v1 }, top),
+        at({ u: u1, v: v1 }, bottom),
+        at({ u: u1, v: v0 }, bottom),
+      ]);
+    }
   }
 
   update(_time: number, delta: number): void {
@@ -152,7 +240,7 @@ class CrowdScene extends Phaser.Scene {
   private advance(walker: Walker, seconds: number): void {
     const wanderer = stepWander(walker.wanderer, seconds, walker.random, WANDER);
     walker.wanderer = wanderer;
-    walker.container.setPosition(wanderer.x, wanderer.y).setDepth(wanderer.y);
+    place(walker.container, wanderer);
 
     const name = wanderer.pause > 0 ? "idle" : "walk";
     if (name !== walker.animation) {
