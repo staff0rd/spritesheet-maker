@@ -75,5 +75,14 @@ export const PART_CATALOG: PartCatalog = {
       ],
     },
   ],
-  drawOrder: { NE: FACING_AWAY, SE: FACING_CAMERA, SW: FACING_CAMERA, NW: FACING_AWAY },
+  drawOrder: {
+    N: FACING_AWAY,
+    NE: FACING_AWAY,
+    E: FACING_AWAY,
+    SE: FACING_CAMERA,
+    S: FACING_CAMERA,
+    SW: FACING_CAMERA,
+    W: FACING_AWAY,
+    NW: FACING_AWAY,
+  },
 };

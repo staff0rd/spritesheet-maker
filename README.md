@@ -22,7 +22,7 @@ If Playwright's Chromium is missing, run `npx playwright install chromium`.
 - Body sheets are `body/<variant>.png`. Every other part is rendered once per body as `<category>/<variant>.<body>.png`, so clothing fits each build.
 - When rendering a non-body part, the body is drawn depth-only (`colorWrite: false`), so body parts in front of clothing (e.g. an arm in front of the torso) cut holes in that layer.
 - Everything renders in neutral greys with baked shading on a transparent background, ready for a multiply tint.
-- One row per direction, in `NE`, `SE`, `SW`, `NW` order; one column per animation frame. Every frame is the same size, with the character's feet at the manifest's `anchor` pixel.
+- One row per direction, in `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW` order (clockwise from screen-up); one column per animation frame. Every frame is the same size, with the character's feet at the manifest's `anchor` pixel.
 - Orthographic camera at 30° elevation and 45° yaw.
 
 ## Manifest

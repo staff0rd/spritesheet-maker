@@ -3,17 +3,17 @@ import { DIRECTIONS, facingYaw } from "./directions";
 import { computeSheetLayout } from "./layout";
 
 describe("DIRECTIONS", () => {
-  it("orders directions clockwise starting at NE", () => {
-    expect(DIRECTIONS).toEqual(["NE", "SE", "SW", "NW"]);
+  it("orders directions clockwise starting at N", () => {
+    expect(DIRECTIONS).toEqual(["N", "NE", "E", "SE", "S", "SW", "W", "NW"]);
   });
 
-  it("assigns each direction a distinct quarter-turn yaw", () => {
+  it("assigns each direction a distinct eighth-turn yaw", () => {
     const yaws = DIRECTIONS.map(facingYaw);
-    expect(new Set(yaws).size).toBe(4);
+    expect(new Set(yaws).size).toBe(8);
     for (const [index, yaw] of yaws.entries()) {
       const next = yaws[(index + 1) % yaws.length];
       const delta = (((yaw - next) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-      expect(delta).toBeCloseTo(Math.PI / 2);
+      expect(delta).toBeCloseTo(Math.PI / 4);
     }
   });
 });
@@ -25,17 +25,17 @@ describe("computeSheetLayout", () => {
     const layout = computeSheetLayout(frameSize, DIRECTIONS, 3);
 
     expect(layout.columns).toBe(3);
-    expect(layout.rows).toBe(4);
-    expect(layout.sheetSize).toEqual({ width: 192, height: 384 });
-    expect(layout.frames).toHaveLength(12);
+    expect(layout.rows).toBe(8);
+    expect(layout.sheetSize).toEqual({ width: 192, height: 768 });
+    expect(layout.frames).toHaveLength(24);
   });
 
   it("computes frame rects in row-major order", () => {
     const layout = computeSheetLayout(frameSize, DIRECTIONS, 3);
 
-    expect(layout.frames[0]).toEqual({ index: 0, direction: "NE", frame: 0, x: 0, y: 0, width: 64, height: 96 });
-    expect(layout.frames[5]).toEqual({ index: 5, direction: "SE", frame: 2, x: 128, y: 96, width: 64, height: 96 });
-    expect(layout.frames[11]).toEqual({ index: 11, direction: "NW", frame: 2, x: 128, y: 288, width: 64, height: 96 });
+    expect(layout.frames[0]).toEqual({ index: 0, direction: "N", frame: 0, x: 0, y: 0, width: 64, height: 96 });
+    expect(layout.frames[5]).toEqual({ index: 5, direction: "NE", frame: 2, x: 128, y: 96, width: 64, height: 96 });
+    expect(layout.frames[23]).toEqual({ index: 23, direction: "NW", frame: 2, x: 128, y: 672, width: 64, height: 96 });
   });
 
   it("follows the given direction order", () => {

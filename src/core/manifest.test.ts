@@ -22,7 +22,7 @@ const catalog: PartCatalog = {
     },
     { id: "top", tintGroup: "cloth", optional: true, variants: [{ id: "tshirt", kind: "shirt", params: {} }] },
   ],
-  drawOrder: { NE: order, SE: order, SW: order, NW: order },
+  drawOrder: { N: order, NE: order, E: order, SE: order, S: order, SW: order, W: order, NW: order },
 };
 
 describe("buildManifest", () => {
@@ -34,9 +34,9 @@ describe("buildManifest", () => {
       seed: 1,
       frameSize: { width: 64, height: 96 },
       anchor: { x: 32, y: 88 },
-      sheetSize: { width: 64, height: 384 },
-      directions: ["NE", "SE", "SW", "NW"],
-      directionRows: { NE: 0, SE: 1, SW: 2, NW: 3 },
+      sheetSize: { width: 64, height: 768 },
+      directions: ["N", "NE", "E", "SE", "S", "SW", "W", "NW"],
+      directionRows: { N: 0, NE: 1, E: 2, SE: 3, S: 4, SW: 5, W: 6, NW: 7 },
       animations: { idle: { frames: [0], fps: 3 } },
       baseCategory: "body",
       categories: {
@@ -54,7 +54,7 @@ describe("buildManifest", () => {
           variants: [{ id: "tshirt", files: { slim: "top/tshirt.slim.png", broad: "top/tshirt.broad.png" } }],
         },
       },
-      drawOrder: { NE: ["body", "top"], SE: ["body", "top"], SW: ["body", "top"], NW: ["body", "top"] },
+      drawOrder: Object.fromEntries(["N", "NE", "E", "SE", "S", "SW", "W", "NW"].map((direction) => [direction, ["body", "top"]])),
     });
   });
 
