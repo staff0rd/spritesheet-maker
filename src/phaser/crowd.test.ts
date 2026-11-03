@@ -29,7 +29,8 @@ import {
   STAIRWELL,
   stairBoxes,
   stairDepth,
-  stairRail,
+  stairRails,
+  frontRailDepth,
   stepWander,
   tintColor,
   toGrid,
@@ -333,12 +334,19 @@ describe("flightRoute", () => {
 });
 
 describe("stairRail", () => {
-  it("runs up the outer edge of both flights and around the landing", () => {
-    const rail = stairRail(1);
-    expect(rail[0]).toEqual({ u: 0, v: STAIRWELL.back, z: 120 });
-    expect(rail.at(-1)).toEqual({ u: STAIRWELL.width, v: STAIRWELL.back, z: 240 });
-    expect(rail.slice(1, -1).every(({ z }) => z === 180)).toBe(true);
-    expect(Math.max(...rail.map(({ v }) => v))).toBe(STAIRWELL.front);
+  it("runs up the back flight's outer edge and around the landing, leaving the front flight open", () => {
+    const { back, front } = stairRails(1);
+    expect(back[0]).toEqual({ u: 0, v: STAIRWELL.back, z: 120 });
+    expect(back.at(-1)).toEqual(front[0]);
+    expect(front.at(-1)).toEqual({ u: STAIRWELL.width, v: STAIRWELL.turn, z: 180 });
+    expect([...back.slice(1), ...front].every(({ z }) => z === 180)).toBe(true);
+  });
+
+  it("draws the landing's front rail over people on that level's stairs but under the next slab's walkers", () => {
+    const foot = toScreen(config.floor, { u: 0.1, v: 0.66 });
+    expect(frontRailDepth(config.floor, 0)).toBeGreaterThan(walkerDepth(config.floor, { y: foot.y, z: 60, level: 0 }));
+    expect(frontRailDepth(config.floor, 0)).toBeGreaterThan(walkerDepth(config.floor, { y: foot.y, z: 70, level: 1 }));
+    expect(frontRailDepth(config.floor, 0)).toBeLessThan(depthFor(2, -500));
   });
 });
 

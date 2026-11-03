@@ -173,18 +173,19 @@ export interface RailPoint extends GridPoint {
   z: number;
 }
 
-export function stairRail(level: number): RailPoint[] {
+export function stairRails(level: number): { back: RailPoint[]; front: RailPoint[] } {
   const { width, back, turn, front } = STAIRWELL;
   const base = levelHeight(level);
   const landing = base + FLOOR_HEIGHT / 2;
-  return [
-    { u: 0, v: back, z: base },
-    { u: 0, v: turn, z: landing },
-    { u: 0, v: front, z: landing },
-    { u: width, v: front, z: landing },
-    { u: width, v: turn, z: landing },
-    { u: width, v: back, z: base + FLOOR_HEIGHT },
-  ];
+  const corner = { u: 0, v: front, z: landing };
+  return {
+    back: [{ u: 0, v: back, z: base }, { u: 0, v: turn, z: landing }, corner],
+    front: [corner, { u: width, v: front, z: landing }, { u: width, v: turn, z: landing }],
+  };
+}
+
+export function frontRailDepth(floor: Floor, level: number): number {
+  return depthFor(level + 1, toScreen(floor, { u: STAIRWELL.width, v: STAIRWELL.front }).y);
 }
 
 export function stairDepth(floor: Floor, level: number): number {

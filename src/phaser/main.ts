@@ -17,12 +17,14 @@ import {
   slabDepth,
   stairBoxes,
   stairDepth,
-  stairRail,
+  stairRails,
+  frontRailDepth,
   stepWander,
   tintColor,
   toScreen,
   walkerDepth,
   type GridPoint,
+  type RailPoint,
   type WanderConfig,
   type Wanderer,
 } from "./crowd";
@@ -241,18 +243,27 @@ class CrowdScene extends Phaser.Scene {
       ]);
     }
 
-    const rail = stairRail(level);
-    stairs.lineStyle(2, COLORS.rail);
+    const { back, front } = stairRails(level);
+    this.drawRail(stairs, back, at);
+    this.drawRail(this.add.graphics().setDepth(frontRailDepth(WANDER.floor, level)), front, at);
+  }
+
+  private drawRail(
+    graphics: Phaser.GameObjects.Graphics,
+    rail: RailPoint[],
+    at: (point: GridPoint, z: number) => Point,
+  ): void {
+    graphics.lineStyle(2, COLORS.rail);
     rail.slice(1).forEach((to, index) => {
       const from = rail[index];
       const steps = Math.max(1, Math.round(Math.hypot(to.u - from.u, to.v - from.v) / RAIL_POST_SPACING));
       const top = (t: number): Point =>
         at({ u: from.u + (to.u - from.u) * t, v: from.v + (to.v - from.v) * t }, from.z + (to.z - from.z) * t + RAIL_HEIGHT);
-      stairs.lineBetween(top(0).x, top(0).y, top(1).x, top(1).y);
+      graphics.lineBetween(top(0).x, top(0).y, top(1).x, top(1).y);
       for (let post = 0; post <= steps; post++) {
         const t = post / steps;
         const foot = at({ u: from.u + (to.u - from.u) * t, v: from.v + (to.v - from.v) * t }, from.z + (to.z - from.z) * t);
-        stairs.lineBetween(foot.x, foot.y, top(t).x, top(t).y);
+        graphics.lineBetween(foot.x, foot.y, top(t).x, top(t).y);
       }
     });
   }
