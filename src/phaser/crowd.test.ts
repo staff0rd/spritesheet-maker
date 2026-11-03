@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PART_CATALOG } from "../core/catalog";
 import { DEFAULT_CAPTURE_CONFIG } from "../core/config";
+import { DIRECTIONS } from "../core/directions";
 import { computeSheetLayout } from "../core/layout";
 import { buildManifest } from "../core/manifest";
 import { createRandom } from "../core/random";
@@ -12,6 +13,7 @@ import {
   MAX_CROWD,
   MIN_CROWD,
   facingFor,
+  headingAngle,
   frameIndex,
   sheetColumns,
   stepWander,
@@ -84,13 +86,40 @@ describe("diamondPoint", () => {
 });
 
 describe("facingFor", () => {
-  it("snaps screen vectors to the nearest iso direction", () => {
+  const toward = (angle: number) => facingFor(Math.cos(angle), Math.sin(angle));
+  const clockwise = DIRECTIONS.map((direction) => ({ direction, angle: headingAngle(direction) }));
+
+  it("snaps screen vectors to the nearest of 8 headings", () => {
+    expect(facingFor(0, -3)).toBe("N");
     expect(facingFor(2, -1)).toBe("NE");
+    expect(facingFor(5, 0)).toBe("E");
     expect(facingFor(2, 1)).toBe("SE");
+    expect(facingFor(0, 3)).toBe("S");
     expect(facingFor(-2, 1)).toBe("SW");
+    expect(facingFor(-5, 0)).toBe("W");
     expect(facingFor(-2, -1)).toBe("NW");
-    expect(facingFor(0.1, -5)).toBe("NE");
-    expect(facingFor(-5, -0.1)).toBe("NW");
+  });
+
+  it("uses projected iso angles for the diagonals", () => {
+    expect(headingAngle("NE")).toBeCloseTo(-Math.atan(0.5));
+    expect(facingFor(1, -1)).toBe("NE");
+    expect(facingFor(1, -2)).toBe("N");
+    expect(facingFor(-1, 2)).toBe("S");
+    expect(facingFor(4, -1)).toBe("NE");
+    expect(facingFor(8, -1)).toBe("E");
+  });
+
+  it("switches heading midway between neighbours", () => {
+    const epsilon = 1e-6;
+    clockwise.forEach(({ direction, angle }, index) => {
+      const next = clockwise[(index + 1) % clockwise.length];
+      let nextAngle = next.angle;
+      if (nextAngle < angle) nextAngle += 2 * Math.PI;
+      const boundary = (angle + nextAngle) / 2;
+      expect(toward(angle)).toBe(direction);
+      expect(toward(boundary - epsilon)).toBe(direction);
+      expect(toward(boundary + epsilon)).toBe(next.direction);
+    });
   });
 
   it("has no facing for a zero vector", () => {

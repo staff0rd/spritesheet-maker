@@ -1,4 +1,4 @@
-import type { Direction } from "../core/directions";
+import { DIRECTIONS, type Direction } from "../core/directions";
 import type { Point } from "../core/layout";
 import type { Manifest } from "../core/manifest";
 import type { Random } from "../core/random";
@@ -41,10 +41,35 @@ export function diamondPoint(random: Random, halfWidth: number, halfHeight: numb
   return { x: (u - v) * halfWidth, y: (u + v - 1) * halfHeight };
 }
 
+const SCREEN_HEADINGS: Record<Direction, Point> = {
+  N: { x: 0, y: -1 },
+  NE: { x: 2, y: -1 },
+  E: { x: 1, y: 0 },
+  SE: { x: 2, y: 1 },
+  S: { x: 0, y: 1 },
+  SW: { x: -2, y: 1 },
+  W: { x: -1, y: 0 },
+  NW: { x: -2, y: -1 },
+};
+
+export function headingAngle(direction: Direction): number {
+  const { x, y } = SCREEN_HEADINGS[direction];
+  return Math.atan2(y, x);
+}
+
+function angleBetween(a: number, b: number): number {
+  const diff = Math.abs(a - b) % (2 * Math.PI);
+  return diff > Math.PI ? 2 * Math.PI - diff : diff;
+}
+
 export function facingFor(dx: number, dy: number): Direction | undefined {
   if (dx === 0 && dy === 0) return undefined;
-  if (dx >= 0) return dy < 0 ? "NE" : "SE";
-  return dy < 0 ? "NW" : "SW";
+  const angle = Math.atan2(dy, dx);
+  let best: Direction = DIRECTIONS[0];
+  for (const direction of DIRECTIONS) {
+    if (angleBetween(angle, headingAngle(direction)) < angleBetween(angle, headingAngle(best))) best = direction;
+  }
+  return best;
 }
 
 interface Floor {
