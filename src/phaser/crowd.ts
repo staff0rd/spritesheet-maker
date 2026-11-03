@@ -95,12 +95,48 @@ export function slabDepth(level: number): number {
   return depthFor(level, -LEVEL_DEPTH / 2);
 }
 
+export interface GridBox {
+  u0: number;
+  u1: number;
+  v0: number;
+  v1: number;
+}
+
+export const PILLAR_SIZE = 0.01;
+const PILLAR_CLEARANCE = 0.015;
+
+export function pillars(level: number): GridBox[] {
+  if (level >= LEVEL_COUNT - 1) return [];
+  const far = UPPER_SIZE - PILLAR_SIZE;
+  return [
+    { u: 0, v: 0 },
+    { u: far, v: 0 },
+    { u: 0, v: far },
+    { u: far, v: far },
+  ].map(({ u, v }) => ({ u0: u, u1: u + PILLAR_SIZE, v0: v, v1: v + PILLAR_SIZE }));
+}
+
+export function pillarDepth(floor: Floor, level: number, { u1, v1 }: GridBox): number {
+  return depthFor(level, toScreen(floor, { u: u1, v: v1 }).y);
+}
+
+function obstacles(level: number): GridBox[] {
+  const blocked = pillars(level).map(({ u0, u1, v0, v1 }) => ({
+    u0: u0 - PILLAR_CLEARANCE,
+    u1: u1 + PILLAR_CLEARANCE,
+    v0: v0 - PILLAR_CLEARANCE,
+    v1: v1 + PILLAR_CLEARANCE,
+  }));
+  if (level > 0) return blocked;
+  return [{ u0: -Infinity, u1: STAIRWELL.width, v0: STAIRWELL.back, v1: STAIRWELL.front }, ...blocked];
+}
+
 export function onLevel(floor: Floor, level: number, point: Point): boolean {
   const { u, v } = toGrid(floor, point);
   const epsilon = 1e-9;
   if (u < -epsilon || v < -epsilon || u > 1 + epsilon || v > 1 + epsilon) return false;
-  if (level > 0) return u <= UPPER_SIZE + epsilon && v <= UPPER_SIZE + epsilon;
-  return !(u <= STAIRWELL.width && v >= STAIRWELL.back && v <= STAIRWELL.front);
+  if (level > 0 && (u > UPPER_SIZE + epsilon || v > UPPER_SIZE + epsilon)) return false;
+  return !obstacles(level).some((box) => u >= box.u0 && u <= box.u1 && v >= box.v0 && v <= box.v1);
 }
 
 export function pickLevel(random: Random): number {
@@ -110,17 +146,16 @@ export function pickLevel(random: Random): number {
 }
 
 export function levelPoint(random: Random, floor: Floor, level: number): Point {
-  if (level > 0) return toScreen(floor, { u: random() * UPPER_SIZE, v: random() * UPPER_SIZE });
   for (;;) {
-    const point = diamondPoint(random, floor.halfWidth, floor.halfHeight);
+    const point =
+      level > 0
+        ? toScreen(floor, { u: random() * UPPER_SIZE, v: random() * UPPER_SIZE })
+        : diamondPoint(random, floor.halfWidth, floor.halfHeight);
     if (onLevel(floor, level, point)) return point;
   }
 }
 
-export function pathClear(floor: Floor, level: number, from: Point, to: Point): boolean {
-  if (level > 0) return true;
-  const a = toGrid(floor, from);
-  const b = toGrid(floor, to);
+function segmentHits(a: GridPoint, b: GridPoint, box: GridBox): boolean {
   let enter = 0;
   let exit = 1;
   const clip = (start: number, delta: number, min: number, max: number): boolean => {
@@ -131,9 +166,13 @@ export function pathClear(floor: Floor, level: number, from: Point, to: Point): 
     exit = Math.min(exit, Math.max(t0, t1));
     return enter <= exit;
   };
-  const hits =
-    clip(a.u, b.u - a.u, -Infinity, STAIRWELL.width) && clip(a.v, b.v - a.v, STAIRWELL.back, STAIRWELL.front);
-  return !hits;
+  return clip(a.u, b.u - a.u, box.u0, box.u1) && clip(a.v, b.v - a.v, box.v0, box.v1);
+}
+
+export function pathClear(floor: Floor, level: number, from: Point, to: Point): boolean {
+  const a = toGrid(floor, from);
+  const b = toGrid(floor, to);
+  return !obstacles(level).some((box) => segmentHits(a, b, box));
 }
 
 export interface StairBox {
@@ -161,15 +200,15 @@ export function stairBoxes(level: number): { lower: StairBox[]; upper: StairBox[
   });
   const steps = Array.from({ length: STEPS_PER_FLIGHT }, (_, index) => index);
   return {
-    lower: [
-      ...steps.map((index) => box(0, width / 2, back + index * run, base + (index + 1) * rise, run, base)),
+    lower: steps.map((index) => box(0, width / 2, back + index * run, base + (index + 1) * rise, run, base)),
+    upper: [
+      ...[...steps]
+        .reverse()
+        .map((index) =>
+          box(width / 2, width, turn - (index + 1) * run, base + half + (index + 1) * rise, run, base + half),
+        ),
       box(0, width, turn, base + half, front - turn, base),
     ],
-    upper: [...steps]
-      .reverse()
-      .map((index) =>
-        box(width / 2, width, turn - (index + 1) * run, base + half + (index + 1) * rise, run, base + half),
-      ),
   };
 }
 
@@ -262,7 +301,9 @@ function levelLeg(floor: Floor, level: number, from: Point, to: Point): Waypoint
 
 export function walkerDepth(floor: Floor, { y, z, level }: Pick<Wanderer, "y" | "z" | "level">): number {
   const depth = depthFor(level, y);
-  if (z === levelHeight(level)) return depth;
+  const base = levelHeight(level);
+  if (z === base) return depth;
+  if (z >= base + FLOOR_HEIGHT / 2) return Math.max(depth, upperFlightDepth(floor, level) + 1);
   return Math.max(depth, stairDepth(floor, level) + 1);
 }
 

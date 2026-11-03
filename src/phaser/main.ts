@@ -26,6 +26,8 @@ import {
   type GridPoint,
   type RailPoint,
   type StairBox,
+  pillarDepth,
+  pillars,
   upperFlightDepth,
   type WanderConfig,
   type Wanderer,
@@ -47,6 +49,8 @@ const COLORS = {
   stairFront: 0x7a6a56,
   stairSide: 0x62553f,
   rail: 0xc9c2b4,
+  pillarLeft: 0x8a8f96,
+  pillarRight: 0x666b72,
 };
 const RAIL_HEIGHT = 18;
 const RAIL_POST_SPACING = 0.04;
@@ -219,6 +223,7 @@ class CrowdScene extends Phaser.Scene {
         }
       }
       if (level < LEVEL_COUNT - 1) this.drawStairs(level, at);
+      this.drawPillars(level, at);
     }
   }
 
@@ -231,6 +236,27 @@ class CrowdScene extends Phaser.Scene {
     this.drawSteps(lowerFlight, lower, at);
     this.drawSteps(upperFlight, upper, at);
     this.drawRail(this.add.graphics().setDepth(frontRailDepth(WANDER.floor, level)), front, at);
+  }
+
+  private drawPillars(level: number, at: (point: GridPoint, z: number) => Point): void {
+    const bottom = levelHeight(level);
+    const top = levelHeight(level + 1) - SLAB_THICKNESS;
+    for (const box of pillars(level)) {
+      const { u0, u1, v0, v1 } = box;
+      const pillar = this.add.graphics().setDepth(pillarDepth(WANDER.floor, level, box));
+      fill(pillar, COLORS.pillarLeft, [
+        at({ u: u0, v: v1 }, top),
+        at({ u: u1, v: v1 }, top),
+        at({ u: u1, v: v1 }, bottom),
+        at({ u: u0, v: v1 }, bottom),
+      ]);
+      fill(pillar, COLORS.pillarRight, [
+        at({ u: u1, v: v0 }, top),
+        at({ u: u1, v: v1 }, top),
+        at({ u: u1, v: v1 }, bottom),
+        at({ u: u1, v: v0 }, bottom),
+      ]);
+    }
   }
 
   private drawSteps(
