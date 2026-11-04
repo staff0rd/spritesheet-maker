@@ -38,7 +38,7 @@ function addLayer(provider: PartProvider, rig: Rig, spec: PartSpec, seed: number
   });
 }
 
-function rigFor(body: PartSpec): Rig {
+export function rigFor(body: PartSpec): Rig {
   return createRig(bodyShape(resolveParams(DEFAULT_BODY_PARAMS, body.params, `${body.category}/${body.id}`)));
 }
 
@@ -62,5 +62,11 @@ export function buildDressedCharacter(
 ): Rig {
   const rig = rigFor(body.spec);
   for (const { spec, tint } of [body, ...parts]) addLayer(provider, rig, spec, seed, { depthOnly: false, tint });
+  return rig;
+}
+
+export function buildLayer(provider: PartProvider, seed: number, body: PartSpec, { spec, tint }: TintedPart): Rig {
+  const rig = rigFor(body);
+  addLayer(provider, rig, spec, seed, { depthOnly: false, tint });
   return rig;
 }

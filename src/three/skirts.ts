@@ -1,34 +1,75 @@
-import type { BufferAttribute, Mesh } from "three";
+import { type BufferAttribute, BufferGeometry, type Matrix4, type Mesh, type Sphere } from "three";
 import { fitSkirts } from "../scene/parts/skirtFit";
-import type { Rig } from "../scene/rig";
+import type { JointName, Rig } from "../scene/rig";
 
 const SKIRT_FRAMES_PER_CYCLE = 24;
+
+interface SkirtFrame {
+  position: BufferAttribute;
+  sphere: Sphere;
+}
+
+export interface SkirtTemplate {
+  joint: JointName;
+  rest: BufferGeometry;
+  transform: Matrix4;
+  fit: unknown;
+  frames: Map<string, SkirtFrame>;
+}
+
+export interface TintedSkirt {
+  template: SkirtTemplate;
+  colour: BufferAttribute;
+  frames: Map<string, BufferGeometry>;
+}
+
+export interface FittedSkirt {
+  mesh: Mesh;
+  skirt: TintedSkirt;
+}
 
 export function skirtFrame(cycle: number): number {
   return Math.floor((((cycle % 1) + 1) % 1) * SKIRT_FRAMES_PER_CYCLE) % SKIRT_FRAMES_PER_CYCLE;
 }
 
-export function cachedSkirtFitter(rig: Rig): (key: string) => void {
-  const skirts: Mesh[] = [];
-  rig.joints.torso.traverse((object) => {
-    if (object.userData.skirtFit) skirts.push(object as Mesh);
-  });
+export function withAttributes(base: BufferGeometry, overrides: Record<string, BufferAttribute>): BufferGeometry {
+  const geometry = new BufferGeometry();
+  geometry.setIndex(base.index);
+  for (const [name, attribute] of Object.entries({ ...base.attributes, ...overrides })) {
+    geometry.setAttribute(name, attribute as BufferAttribute);
+  }
+  return geometry;
+}
+
+function frameGeometry({ template, colour, frames }: TintedSkirt, key: string): BufferGeometry {
+  let geometry = frames.get(key);
+  if (!geometry) {
+    const { position, sphere } = template.frames.get(key)!;
+    geometry = withAttributes(template.rest, { position, color: colour });
+    geometry.boundingSphere = sphere;
+    frames.set(key, geometry);
+  }
+  return geometry;
+}
+
+export function sharedSkirtFitter(rig: Rig, skirts: readonly FittedSkirt[]): (key: string) => void {
   if (skirts.length === 0) return () => {};
-  const fitted = new Map<string, Float32Array[]>();
   let current = "";
   return (key) => {
     if (key === current) return;
     current = key;
-    const positions = skirts.map((skirt) => skirt.geometry.getAttribute("position") as BufferAttribute);
-    const cached = fitted.get(key);
-    if (!cached) {
+    if (!skirts.every(({ skirt }) => skirt.template.frames.has(key))) {
+      for (const { mesh, skirt } of skirts) {
+        const position = (skirt.template.rest.getAttribute("position") as BufferAttribute).clone();
+        mesh.geometry = withAttributes(skirt.template.rest, { position, color: skirt.colour });
+      }
       fitSkirts(rig);
-      fitted.set(key, positions.map((position) => Float32Array.from(position.array as Float32Array)));
-      return;
+      for (const { mesh, skirt } of skirts) {
+        if (skirt.template.frames.has(key)) continue;
+        const position = mesh.geometry.getAttribute("position") as BufferAttribute;
+        skirt.template.frames.set(key, { position, sphere: mesh.geometry.boundingSphere!.clone() });
+      }
     }
-    positions.forEach((position, index) => {
-      (position.array as Float32Array).set(cached[index]);
-      position.needsUpdate = true;
-    });
+    for (const { mesh, skirt } of skirts) mesh.geometry = frameGeometry(skirt, key);
   };
 }

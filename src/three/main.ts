@@ -10,11 +10,10 @@ import { MAX_STEP_SECONDS, planCrowd, WANDER } from "../crowd/plan";
 import { LEVEL_COUNT, levelHeight, stepWander, toGrid, type Wanderer } from "../phaser/crowd";
 import { poseJoints } from "../scene/animation";
 import { createLitScene } from "../scene/capture";
-import { buildDressedCharacter } from "../scene/character";
 import type { Rig } from "../scene/rig";
 import { proceduralProvider } from "../scene/parts/procedural";
-import { bakeRig, disposeBakedRigs } from "./bake";
-import { cachedSkirtFitter, skirtFrame } from "./skirts";
+import { RigFactory } from "./bake";
+import { skirtFrame } from "./skirts";
 import { buildLevels } from "./levels";
 import { outfitFor } from "./outfit";
 import { blendPose, clip, groundHeight, headingYaw, strideLength, turnToward } from "./walker";
@@ -118,17 +117,18 @@ function start(): void {
 
   let crowd = new Group();
   let walkers: Walker[] = [];
+  let factory = new RigFactory(proceduralProvider, DEFAULT_CAPTURE_CONFIG.seed);
   scene.add(crowd);
 
   const spawn = (seed: number, size: number): void => {
     scene.remove(crowd);
-    disposeBakedRigs(crowd);
+    factory.dispose();
+    factory = new RigFactory(proceduralProvider, DEFAULT_CAPTURE_CONFIG.seed);
     crowd = new Group();
     walkers = planCrowd(seed, size, (random) =>
       outfitFor(PART_CATALOG, pickCatalogCharacter(PART_CATALOG, random)),
     ).map(({ look, wanderer, random, phase }) => {
-      const rig = buildDressedCharacter(proceduralProvider, DEFAULT_CAPTURE_CONFIG.seed, look.body, look.parts);
-      bakeRig(rig);
+      const { rig, fitSkirts } = factory.build(look.body, look.parts);
       const object = new Group();
       object.add(rig.root);
       object.rotation.y = facingYaw(wanderer.direction);
@@ -142,7 +142,7 @@ function start(): void {
         stride: strideLength(rig.shape),
         walking: false,
         cycle: 0,
-        fitSkirts: cachedSkirtFitter(rig),
+        fitSkirts,
       };
       advance(walker, 0);
       return walker;
