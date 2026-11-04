@@ -81,6 +81,11 @@ function legReach(rig: Rig, upper: JointName, lower: JointName): number {
 }
 
 export function applyPose(rig: Rig, pose: Pose): void {
+  poseJoints(rig, pose);
+  fitSkirts(rig);
+}
+
+export function poseJoints(rig: Rig, pose: Pose): void {
   for (const [name, group] of Object.entries(rig.joints) as [JointName, Rig["joints"][JointName]][]) {
     group.rotation.x = pose[name] ?? 0;
   }
@@ -90,5 +95,4 @@ export function applyPose(rig: Rig, pose: Pose): void {
   rig.joints.armRight.position.y += rig.shape.shoulder.y;
   const reach = Math.max(...LEGS.map((leg) => legReach(rig, leg.upper, leg.lower)));
   rig.root.position.y = (reach - rig.shape.hip.y) * rig.shape.height;
-  fitSkirts(rig);
 }

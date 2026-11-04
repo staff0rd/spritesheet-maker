@@ -10,6 +10,7 @@ export const WANDER: WanderConfig = {
   minLeg: 80,
 };
 
+export const MAX_STEP_SECONDS = 0.1;
 export const SLAB_THICKNESS = 12;
 export const RAIL_HEIGHT = 18;
 export const RAIL_POST_SPACING = 0.04;

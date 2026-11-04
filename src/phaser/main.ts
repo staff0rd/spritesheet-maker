@@ -5,7 +5,7 @@ import type { Manifest } from "../core/manifest";
 import type { Random } from "../core/random";
 import type { Point } from "../core/layout";
 import { element, mountCrowdControls, showError } from "../crowd/controls";
-import { COLORS, planCrowd, RAIL_HEIGHT, RAIL_POST_SPACING, SLAB_THICKNESS, WANDER, type CrowdMember } from "../crowd/plan";
+import { COLORS, MAX_STEP_SECONDS, planCrowd, RAIL_HEIGHT, RAIL_POST_SPACING, SLAB_THICKNESS, WANDER, type CrowdMember } from "../crowd/plan";
 import {
   animationFrame,
   FLOOR_HEIGHT,
@@ -32,7 +32,6 @@ import {
   type Wanderer,
 } from "./crowd";
 
-const MAX_STEP_SECONDS = 0.1;
 
 interface Walker {
   character: Character;
