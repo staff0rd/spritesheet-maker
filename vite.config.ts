@@ -6,7 +6,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      input: { scene: "index.html", preview: "preview.html", phaser: "phaser.html" },
+      input: { scene: "index.html", preview: "preview.html", phaser: "phaser.html", three: "three.html" },
     },
   },
 });

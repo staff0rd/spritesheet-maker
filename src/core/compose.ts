@@ -1,6 +1,6 @@
 import type { Direction } from "./directions";
 import type { Manifest } from "./manifest";
-import type { CategoryId, TintGroup } from "./parts";
+import type { CategoryId, PartCatalog, TintGroup } from "./parts";
 import type { Random } from "./random";
 
 export const PALETTES: Readonly<Record<TintGroup, readonly string[]>> = {
@@ -49,21 +49,36 @@ function pick<T>(random: Random, items: readonly T[]): T {
   return items[Math.floor(random() * items.length)];
 }
 
-function categoriesOf(manifest: Manifest) {
+interface PickableCategory {
+  id: CategoryId;
+  tintGroup: TintGroup;
+  optional: boolean;
+  variants: readonly { id: string }[];
+}
+
+function categoriesOf(manifest: Manifest): PickableCategory[] {
   return Object.entries(manifest.categories).map(([id, category]) => ({ id: id as CategoryId, ...category! }));
 }
 
-export function pickCharacter(manifest: Manifest, random: Random): Character {
+function pickParts(categories: readonly PickableCategory[], baseCategory: CategoryId, random: Random): Character {
   const parts: Character["parts"] = {};
-  for (const category of categoriesOf(manifest)) {
+  for (const category of categories) {
     const chance = OPTIONAL_CHANCE[category.id] ?? DEFAULT_OPTIONAL_CHANCE;
     const present = !category.optional || random() < chance;
     const variant = pick(random, category.variants).id;
     const tint = pick(random, PALETTES[category.tintGroup]);
     if (present) parts[category.id] = { variant, tint };
   }
-  if (!parts[manifest.baseCategory]) throw new Error(`Manifest has no "${manifest.baseCategory}" category`);
+  if (!parts[baseCategory]) throw new Error(`No "${baseCategory}" category`);
   return { parts };
+}
+
+export function pickCharacter(manifest: Manifest, random: Random): Character {
+  return pickParts(categoriesOf(manifest), manifest.baseCategory, random);
+}
+
+export function pickCatalogCharacter(catalog: PartCatalog, random: Random): Character {
+  return pickParts(catalog.categories, catalog.baseCategory, random);
 }
 
 export function layersFor(manifest: Manifest, character: Character, direction: Direction): Layer[] {

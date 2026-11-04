@@ -623,4 +623,9 @@ describe("crowdSize", () => {
     expect(crowdSize("99999")).toBe(MAX_CROWD);
     expect(crowdSize("320.6")).toBe(321);
   });
+
+  it("clamps to a custom maximum", () => {
+    expect(crowdSize("99999", 500)).toBe(500);
+    expect(crowdSize(null, 500)).toBe(DEFAULT_CROWD);
+  });
 });

@@ -1,4 +1,4 @@
-import { DirectionalLight, HemisphereLight, Mesh, Scene, WebGLRenderer } from "three";
+import { DirectionalLight, HemisphereLight, Mesh, type Object3D, Scene, WebGLRenderer } from "three";
 import { facingYaw } from "../core/directions";
 import { computeSheetLayout, type Size } from "../core/layout";
 import { applyPose } from "./animation";
@@ -26,8 +26,8 @@ export function createLitScene(): Scene {
   return scene;
 }
 
-function dispose(scene: Scene): void {
-  scene.traverse((object) => {
+export function disposeTree(root: Object3D): void {
+  root.traverse((object) => {
     if (object instanceof Mesh) {
       object.geometry.dispose();
       for (const material of [object.material].flat()) material.dispose();
@@ -57,6 +57,6 @@ export function renderSheet({ config, poses, body, part }: RenderSheetRequest): 
     context.drawImage(renderer.domElement, rect.x, rect.y, rect.width, rect.height);
   }
 
-  dispose(scene);
+  disposeTree(scene);
   return sheet.toDataURL("image/png");
 }

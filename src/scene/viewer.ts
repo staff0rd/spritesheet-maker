@@ -1,8 +1,8 @@
-import { GridHelper, type Group, Mesh, PerspectiveCamera, WebGLRenderer } from "three";
+import { GridHelper, PerspectiveCamera, WebGLRenderer } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PART_CATALOG } from "../core/catalog";
 import type { CategoryId, PartSpec } from "../core/parts";
-import { createLitScene } from "./capture";
+import { createLitScene, disposeTree } from "./capture";
 import { applyPose, CLIPS } from "./animation";
 import { buildDressedCharacter, type TintedPart } from "./character";
 import type { Rig } from "./rig";
@@ -34,15 +34,6 @@ function labelled(text: string, ...inputs: HTMLElement[]): HTMLLabelElement {
   name.style.width = "56px";
   label.append(name, ...inputs);
   return label;
-}
-
-function disposeCharacter(character: Group): void {
-  character.traverse((object) => {
-    if (object instanceof Mesh) {
-      object.geometry.dispose();
-      for (const material of [object.material].flat()) material.dispose();
-    }
-  });
 }
 
 export function mountViewer(container: HTMLElement): void {
@@ -95,7 +86,10 @@ export function mountViewer(container: HTMLElement): void {
   const phaser = document.createElement("a");
   phaser.href = "/phaser.html";
   phaser.textContent = "Phaser crowd (from out/)";
-  panel.append(labelled("seed", seed), randomise, sheets, crowd, phaser);
+  const three = document.createElement("a");
+  three.href = "/three.html";
+  three.textContent = "3-D crowd";
+  panel.append(labelled("seed", seed), randomise, sheets, crowd, phaser, three);
 
   const animation = document.createElement("select");
   animation.add(new Option("rest", NONE));
@@ -119,7 +113,7 @@ export function mountViewer(container: HTMLElement): void {
   function rebuild(): void {
     if (character) {
       scene.remove(character.root);
-      disposeCharacter(character.root);
+      disposeTree(character.root);
     }
     const { body, parts } = selected();
     character = buildDressedCharacter(proceduralProvider, Number(seed.value) || 0, body, parts);
