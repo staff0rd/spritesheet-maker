@@ -8,9 +8,10 @@ import { element, mountCrowdControls, showError } from "../crowd/controls";
 import { planCrowd, WANDER } from "../crowd/plan";
 import { LEVEL_COUNT, levelHeight } from "../phaser/crowd";
 import { applyPose, CLIPS } from "../scene/animation";
-import { createLitScene, disposeTree } from "../scene/capture";
+import { createLitScene } from "../scene/capture";
 import { buildDressedCharacter } from "../scene/character";
 import { proceduralProvider } from "../scene/parts/procedural";
+import { bakeRig, disposeBakedRigs } from "./bake";
 import { buildLevels } from "./levels";
 import { outfitFor } from "./outfit";
 import { screenToWorld, unitsPerGrid, UNITS_PER_Z } from "./world";
@@ -73,12 +74,13 @@ function start(): void {
 
   const spawn = (seed: number, size: number): void => {
     scene.remove(crowd);
-    disposeTree(crowd);
+    disposeBakedRigs(crowd);
     crowd = new Group();
     for (const { look, wanderer, phase } of planCrowd(seed, size, (random) =>
       outfitFor(PART_CATALOG, pickCatalogCharacter(PART_CATALOG, random)),
     )) {
       const rig = buildDressedCharacter(proceduralProvider, DEFAULT_CAPTURE_CONFIG.seed, look.body, look.parts);
+      bakeRig(rig);
       applyPose(rig, idlePose(phase));
       const walker = new Group();
       walker.add(rig.root);
